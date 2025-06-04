@@ -1,0 +1,435 @@
+<?php
+// app/views/medical_record/consultation_details.php
+require_once __DIR__ . '/../layouts/header.php';
+?>
+
+<h2><?php echo $data['title']; ?></h2>
+
+<?php if (isset($_SESSION['consultation_message_success'])): ?>
+    <p class="success-message"><?php echo $_SESSION['consultation_message_success']; unset($_SESSION['consultation_message_success']); ?></p>
+<?php endif; ?>
+<?php if (isset($data['consultation_message_error']) || isset($_SESSION['consultation_message_error'])): ?>
+    <p class="error-message">
+        <?php
+        if (isset($data['consultation_message_error'])) echo $data['consultation_message_error'];
+        if (isset($_SESSION['consultation_message_error'])) { echo $_SESSION['consultation_message_error']; unset($_SESSION['consultation_message_error']);}
+        ?>
+    </p>
+<?php endif; ?>
+
+
+<div style="display: flex; gap: 30px;">
+    <div style="flex: 1;">
+        <h3>Appointment Information</h3>
+        <p><strong>Date & Time:</strong> <?php echo htmlspecialchars(date('D, M j, Y \a\t g:i A', strtotime($data['appointment']['AppointmentDateTime']))); ?></p>
+        <p><strong>Status:</strong> <?php echo htmlspecialchars($data['appointment']['Status']); ?></p>
+        <p><strong>Reason for Visit:</strong> <?php echo nl2br(htmlspecialchars($data['appointment']['ReasonForVisit'] ?? 'N/A')); ?></p>
+        <p><strong>Consulting Doctor:</strong> Dr. <?php echo htmlspecialchars($data['appointment']['DoctorName'] ?? 'N/A'); ?></p>
+    </div>
+
+    <div style="flex: 1;">
+        <h3>Patient Information</h3>
+        <p><strong>Name:</strong> <?php echo htmlspecialchars($data['patient']['FullName']); ?></p>
+        <p><strong>Date of Birth:</strong> <?php echo htmlspecialchars(date('M j, Y', strtotime($data['patient']['DateOfBirth'] ?? ''))); ?></p>
+        <p><strong>Gender:</strong> <?php echo htmlspecialchars($data['patient']['Gender'] ?? 'N/A'); ?></p>
+        <p><strong>Phone:</strong> <?php echo htmlspecialchars($data['patient']['PhoneNumber'] ?? 'N/A'); ?></p>
+        <p><strong>Email:</strong> <?php echo htmlspecialchars($data['patient']['Email'] ?? 'N/A'); ?></p>
+        <?php if (!empty($data['patient']['MedicalHistorySummary'])): ?>
+            <p><strong>Medical History Summary:</strong><br><?php echo nl2br(htmlspecialchars($data['patient']['MedicalHistorySummary'])); ?></p>
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- THÊM PHẦN LỊCH SỬ BỆNH ÁN Ở ĐÂY -->
+<hr style="margin: 20px 0;">
+<h3>Patient's Medical History</h3>
+<?php if (!empty($data['medicalHistory'])): ?>
+    <table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
+        <thead>
+            <tr style="background-color: #f0f0f0;">
+                <th style="padding: 8px; border: 1px solid #ddd; text-align:left;">Visit Date</th>
+                <th style="padding: 8px; border: 1px solid #ddd; text-align:left;">Consulting Doctor</th>
+                <th style="padding: 8px; border: 1px solid #ddd; text-align:left;">Diagnosis (Summary)</th>
+                <th style="padding: 8px; border: 1px solid #ddd; text-align:left;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($data['medicalHistory'] as $historyItem): ?>
+                <?php // Không hiển thị record của chính cuộc hẹn đang xem trong lịch sử (nếu model không loại trừ)
+                if ($historyItem['AppointmentID'] == $data['appointment']['AppointmentID']) continue;
+                ?>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;"><?php echo htmlspecialchars(date('M j, Y', strtotime($historyItem['VisitDate']))); ?></td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">Dr. <?php echo htmlspecialchars($historyItem['DoctorName']); ?></td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">
+                        <?php
+                        // Hiển thị tóm tắt Diagnosis, ví dụ 100 ký tự đầu
+                        $diagnosisSummary = $historyItem['Diagnosis'] ?? 'N/A';
+                        if (strlen($diagnosisSummary) > 100) {
+                            $diagnosisSummary = substr($diagnosisSummary, 0, 100) . '...';
+                        }
+                        echo htmlspecialchars($diagnosisSummary);
+                        ?>
+                    </td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">
+                       <a href="<?php echo BASE_URL . '/medicalrecord/viewConsultationDetails/' . $historyItem['AppointmentID'] . '?return_to=' . $data['appointment']['AppointmentID']; ?>"  class="btn btn-sm" style="background-color: #6c757d; color:white; text-decoration:none; padding: 3px 6px;">View Details</a>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+<?php else: ?>
+    <p>No prior medical history found for this patient in the system.</p>
+<?php endif; ?>
+
+<hr style="margin: 20px 0;">
+
+<!-- BẮT ĐẦU FORM CHÍNH (chỉ hiển thị đầy đủ cho Doctor phụ trách) -->
+<?php if ($data['isConsultingDoctor']): ?>
+    <form action="<?php echo BASE_URL; ?>/medicalrecord/viewConsultationDetails/<?php echo $data['appointment']['AppointmentID']; ?>" method="POST" id="medicalRecordForm">
+        <?php echo generateCsrfInput(); ?>
+
+        <h3>Consultation Details & Record</h3>
+        <div class="form-group">
+            <label for="symptoms">Symptoms:</label>
+            <textarea name="symptoms" id="symptoms" rows="4" style="width:100%; padding:10px;"><?php echo htmlspecialchars($data['input_symptoms'] ?? $data['medicalRecord']['Symptoms'] ?? ''); ?></textarea>
+        </div>
+        <div class="form-group">
+            <label for="diagnosis">Diagnosis:</label>
+            <textarea name="diagnosis" id="diagnosis" rows="4" style="width:100%; padding:10px;"><?php echo htmlspecialchars($data['input_diagnosis'] ?? $data['medicalRecord']['Diagnosis'] ?? ''); ?></textarea>
+        </div>
+        <div class="form-group">
+            <label for="treatment_plan">Treatment Plan:</label>
+            <textarea name="treatment_plan" id="treatment_plan" rows="4" style="width:100%; padding:10px;"><?php echo htmlspecialchars($data['input_treatment_plan'] ?? $data['medicalRecord']['TreatmentPlan'] ?? ''); ?></textarea>
+        </div>
+        <div class="form-group">
+            <label for="consultation_notes">Additional Notes:</label>
+            <textarea name="consultation_notes" id="consultation_notes" rows="6" style="width:100%; padding:10px;"><?php echo htmlspecialchars($data['input_notes'] ?? $data['medicalRecord']['Notes'] ?? ''); ?></textarea>
+        </div>
+
+        <hr style="margin: 20px 0;">
+        <h3>Prescription</h3>
+
+
+<!-- Phần hiển thị đơn thuốc hiện tại (Admin và Doctor đều có thể xem) -->
+<h4>Current Prescription:</h4>
+    <table style="width:100%; margin-bottom:15px; border-collapse: collapse;" id="currentPrescriptionTable">
+        <thead>
+            <tr style="background-color: #f0f0f0;">
+                <th style="padding: 5px; border: 1px solid #ccc;">Medicine</th>
+                <th style="padding: 5px; border: 1px solid #ccc;">Dosage</th>
+                <th style="padding: 5px; border: 1px solid #ccc;">Frequency</th>
+                <th style="padding: 5px; border: 1px solid #ccc;">Duration</th>
+                <th style="padding: 5px; border: 1px solid #ccc;">Instructions</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+ <p id="no-prescription-message" style="display:none;">No medication in current draft.</p>
+
+
+
+    <hr>
+    <h4>Add/Edit Medicine Details:</h4>
+    <div id="medicine-form-area" style="border: 1px dashed #ccc; padding: 15px; margin-bottom: 15px;">
+        <input type="hidden" id="editing_prescription_id" value="">
+        <div style="margin-bottom: 5px;">
+            <label for="form_medicine_id">Medicine:</label>
+            <select id="form_medicine_id" style="width: auto; margin-right:10px;">
+                <option value="">-- Select Medicine --</option>
+                <?php foreach ($data['allMedicines'] as $medicine): ?>
+                    <option value="<?php echo $medicine['MedicineID']; ?>">
+                        <?php echo htmlspecialchars($medicine['Name']); ?> (<?php echo htmlspecialchars($medicine['Unit'] ?? ''); ?>)
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <label for="form_dosage" style="margin-left:10px;">Dosage:</label>
+            <input type="text" id="form_dosage" placeholder="e.g., 1 tablet, 10ml" style="width: auto; margin-right:10px;">
+        </div>
+        <div style="margin-bottom: 5px;">
+            <label for="form_frequency">Frequency:</label>
+            <input type="text" id="form_frequency" placeholder="e.g., Twice a day" style="width: auto; margin-right:10px;">
+            <label for="form_duration" style="margin-left:10px;">Duration:</label>
+            <input type="text" id="form_duration" placeholder="e.g., 7 days" style="width: auto; margin-right:10px;">
+        </div>
+        <div style="margin-bottom: 5px;">
+            <label for="form_instructions">Instructions:</label>
+            <input type="text" id="form_instructions" placeholder="e.g., After meals" style="width: 80%;">
+        </div>
+        <button type="button" id="add-or-update-medicine-btn" class="btn btn-primary" style="background-color:#007bff;">Add Medicine</button>
+        <button type="button" id="cancel-edit-medicine-btn" class="btn btn-secondary" style="background-color:#6c757d; display:none;">Cancel Edit</button>
+    </div>
+
+    <!-- Input ẩn để lưu trữ danh sách các thuốc sẽ được submit -->
+    <div id="hidden-prescriptions-container">
+        <!-- JavaScript sẽ thêm các input hidden vào đây -->
+    </div>
+
+    <!-- Nút submit chính chỉ hiển thị cho Doctor phụ trách -->
+    <div style="margin-top:20px;">
+        <button type="submit" name="save_record" class="btn">Save Medical Record & Prescription</button>
+    </div>
+
+    </form> <!-- Đóng form chính ở đây, sau tất cả các input và nút submit của Doctor -->
+
+
+    <?php else: // Nếu không phải là Doctor phụ trách (ví dụ: Admin xem) ?>
+    <hr style="margin: 20px 0;">
+    <h3>Consultation Record (Read-only)</h3>
+    <p><strong>Symptoms:</strong><br><?php echo nl2br(htmlspecialchars($data['medicalRecord']['Symptoms'] ?? 'N/A')); ?></p>
+    <p><strong>Diagnosis:</strong><br><?php echo nl2br(htmlspecialchars($data['medicalRecord']['Diagnosis'] ?? 'N/A')); ?></p>
+    <p><strong>Treatment Plan:</strong><br><?php echo nl2br(htmlspecialchars($data['medicalRecord']['TreatmentPlan'] ?? 'N/A')); ?></p>
+    <p><strong>Additional Notes:</strong><br><?php echo nl2br(htmlspecialchars($data['medicalRecord']['Notes'] ?? 'N/A')); ?></p>
+
+    <?php if (!empty($data['currentPrescriptions'])): ?>
+        <hr style="margin: 20px 0;">
+        <h4>Prescription:</h4>
+        <table style="width:100%; margin-bottom:15px; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th>Medicine</th><th>Dosage</th><th>Frequency</th><th>Duration</th><th>Instructions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($data['currentPrescriptions'] as $prescribed): ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($prescribed['MedicineName']); ?> (<?php echo htmlspecialchars($prescribed['MedicineUnit'] ?? ''); ?>)</td>
+                    <td><?php echo htmlspecialchars($prescribed['Dosage']); ?></td>
+                    <td><?php echo htmlspecialchars($prescribed['Frequency']); ?></td>
+                    <td><?php echo htmlspecialchars($prescribed['Duration']); ?></td>
+                    <td><?php echo htmlspecialchars($prescribed['Instructions'] ?? ''); ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    <?php elseif ($data['medicalRecord']): ?>
+        <hr style="margin: 20px 0;">
+        <h4>Prescription:</h4>
+        <p>No medication was prescribed for this consultation.</p>
+    <?php endif; ?>
+
+    <?php if (!$data['medicalRecord']): ?>
+        <p>No medical record has been created for this consultation yet.</p>
+    <?php endif; ?>
+<?php endif; // Kết thúc if ($data['isConsultingDoctor']) ?>
+<!-- Nút Back to Current Consultation và Back to My Schedule hiển thị cho cả Admin và Doctor -->
+<?php if (isset($data['returnToAppointmentId']) && $data['returnToAppointmentId'] != $data['appointment']['AppointmentID']): ?>
+    <p style="margin-top: 20px;">
+        <a href="<?php echo BASE_URL . '/medicalrecord/viewConsultationDetails/' . $data['returnToAppointmentId']; ?>" class="btn" style="background-color: #007bff;">
+            « Back to Current Consultation (ID: <?php echo $data['returnToAppointmentId']; ?>)
+        </a>
+    </p>
+<?php endif; ?>
+
+<p style="margin-top: 20px;"><a href="<?php echo ($data['currentUserRole'] === 'Admin') ? BASE_URL . '/admin/listAllAppointments' : BASE_URL . '/doctor/mySchedule'; ?>" class="btn" style="background-color: #6c757d;">Back to My Schedule / All Appointments</a></p>
+
+<?php
+require_once __DIR__ . '/../layouts/footer.php';
+?>
+
+<script>
+    // Truyền cờ isConsultingDoctor và currentUserRole từ PHP vào JavaScript
+    const IS_CONSULTING_DOCTOR = <?php echo json_encode($data['isConsultingDoctor'] ?? false); ?>;
+    const CURRENT_USER_ROLE = <?php echo json_encode($data['currentUserRole'] ?? ''); ?>;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const currentPrescriptionTableBody = document.querySelector('#currentPrescriptionTable tbody');
+    const medicineFormArea = document.getElementById('medicine-form-area');
+    const formMedicineId = document.getElementById('form_medicine_id');
+    const formDosage = document.getElementById('form_dosage');
+    const formFrequency = document.getElementById('form_frequency');
+    const formDuration = document.getElementById('form_duration');
+    const formInstructions = document.getElementById('form_instructions');
+    const addOrUpdateBtn = document.getElementById('add-or-update-medicine-btn');
+    const cancelEditBtn = document.getElementById('cancel-edit-medicine-btn');
+    const editingPrescriptionIdInput = document.getElementById('editing_prescription_id');
+    const hiddenPrescriptionsContainer = document.getElementById('hidden-prescriptions-container');
+    const noPrescriptionMessage = document.getElementById('no-prescription-message');
+
+    let draftPrescriptions = [];
+    let nextDraftIdSuffix = 0; // Chỉ dùng để tạo ID mới duy nhất ở client
+
+    // Ẩn/hiện các phần tử dựa trên vai trò và quyền
+    if (!IS_CONSULTING_DOCTOR) {
+        if (medicineFormArea) medicineFormArea.style.display = 'none';
+        // Các nút khác liên quan đến việc thêm/sửa draft cũng nên được ẩn
+        // Ví dụ: nếu có nút "+ Add Another Medicine" riêng thì cũng ẩn đi
+    }
+
+
+    // --- HÀM RENDER BẢNG HIỂN THỊ VÀ CẬP NHẬT INPUT ẨN ---
+    function renderAndPopulateHidden() {
+        if (!currentPrescriptionTableBody || !hiddenPrescriptionsContainer) {
+            console.error("Table body or hidden container not found for prescription rendering.");
+            return;
+        }
+
+        currentPrescriptionTableBody.innerHTML = '';
+        hiddenPrescriptionsContainer.innerHTML = ''; // Xóa input ẩn cũ trước khi tạo mới
+
+        if (draftPrescriptions.length === 0) {
+            if (noPrescriptionMessage) noPrescriptionMessage.style.display = 'block';
+            const thead = document.querySelector('#currentPrescriptionTable thead');
+            if (thead) thead.style.display = 'none';
+        } else {
+            if (noPrescriptionMessage) noPrescriptionMessage.style.display = 'none';
+            const thead = document.querySelector('#currentPrescriptionTable thead');
+            if (thead) thead.style.display = ''; // Hoặc 'table-header-group'
+        }
+
+        draftPrescriptions.forEach((item, index) => {
+            // Render dòng cho bảng hiển thị
+            const row = currentPrescriptionTableBody.insertRow();
+            row.setAttribute('data-draft-id', item.draftId);
+
+            row.insertCell().textContent = item.medicineText || '--';
+            row.insertCell().textContent = item.dosage;
+            row.insertCell().textContent = item.frequency;
+            row.insertCell().textContent = item.duration;
+            row.insertCell().textContent = item.instructions;
+
+            const actionsCell = row.insertCell();
+            if (IS_CONSULTING_DOCTOR) { // Chỉ Doctor phụ trách mới có nút Edit/Delete
+                actionsCell.innerHTML = `
+                    <button type="button" class="btn btn-sm btn-info edit-draft-btn" style="background-color: #17a2b8; margin-right:5px; color:white; border:none; cursor:pointer; padding: 3px 6px;">Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger delete-draft-btn" style="background-color: #dc3545; color:white; border:none; cursor:pointer; padding: 3px 6px;">Delete</button>
+                `;
+            } else {
+                actionsCell.textContent = '-'; // Hoặc để trống
+            }
+
+            // Tạo input hidden để submit (chỉ cần nếu isConsultingDoctor vì chỉ họ mới submit form chính)
+            if (IS_CONSULTING_DOCTOR) {
+                Object.keys(item).forEach(key => {
+                    if (key !== 'medicineText') { // Không gửi medicineText
+                        const hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        // Sử dụng index của mảng draftPrescriptions để đảm bảo thứ tự và không bị lỗ hổng index khi xóa
+                        hiddenInput.name = `prescriptions[${index}][${key === 'draftId' ? 'prescription_id_temp' : key}]`; // Gửi draftId để biết cái nào mới, cái nào cũ
+                        hiddenInput.value = item[key];
+                        hiddenPrescriptionsContainer.appendChild(hiddenInput);
+                    }
+                });
+            }
+        });
+    }
+
+    // --- HÀM RESET FORM THÊM/SỬA THUỐC ---
+    function resetMedicineForm() {
+        if (!IS_CONSULTING_DOCTOR) return; // Chỉ reset nếu là Doctor
+        if(editingPrescriptionIdInput) editingPrescriptionIdInput.value = '';
+        if(formMedicineId) formMedicineId.value = '';
+        if(formDosage) formDosage.value = '';
+        if(formFrequency) formFrequency.value = '';
+        if(formDuration) formDuration.value = '';
+        if(formInstructions) formInstructions.value = '';
+        if(addOrUpdateBtn) addOrUpdateBtn.textContent = 'Add Medicine';
+        if(cancelEditBtn) cancelEditBtn.style.display = 'none';
+        if(formMedicineId) formMedicineId.focus();
+    }
+
+    // --- LOAD ĐƠN THUỐC HIỆN TẠI VÀO DRAFT KHI TRANG TẢI ---
+    // Chỉ thực hiện nếu là Doctor và có dữ liệu đơn thuốc cũ
+    if (IS_CONSULTING_DOCTOR && <?php echo json_encode(!empty($data['currentPrescriptions'])); ?>) {
+        <?php if (!empty($data['currentPrescriptions'])): ?>
+            <?php foreach ($data['currentPrescriptions'] as $p): ?>
+                let medicineTextOnLoad = 'Unknown Medicine';
+                if (formMedicineId) { // Đảm bảo formMedicineId tồn tại
+                    const optionFound = Array.from(formMedicineId.options).find(opt => opt.value == '<?php echo $p['MedicineID']; ?>');
+                    if (optionFound) {
+                        medicineTextOnLoad = optionFound.text;
+                    }
+                }
+                draftPrescriptions.push({
+                    draftId: 'db_' + <?php echo $p['PrescriptionID']; ?>, // ID từ DB, có tiền tố 'db_'
+                    medicine_id: '<?php echo $p['MedicineID']; ?>',
+                    medicineText: medicineTextOnLoad,
+                    dosage: '<?php echo addslashes(htmlspecialchars($p['Dosage'])); ?>',
+                    frequency: '<?php echo addslashes(htmlspecialchars($p['Frequency'])); ?>',
+                    duration: '<?php echo addslashes(htmlspecialchars($p['Duration'])); ?>',
+                    instructions: '<?php echo addslashes(htmlspecialchars($p['Instructions'] ?? '')); ?>'
+                });
+            <?php endforeach; ?>
+        <?php endif; ?>
+    }
+    // Luôn render bảng, dù có dữ liệu hay không, để xử lý a/hiện thead và noPrescriptionMessage
+    renderAndPopulateHidden();
+
+
+    // --- SỰ KIỆN CHO NÚT "ADD/UPDATE MEDICINE" ---
+    if (addOrUpdateBtn && IS_CONSULTING_DOCTOR) {
+        addOrUpdateBtn.addEventListener('click', function() {
+            const medicineIdVal = formMedicineId.value;
+            const dosageVal = formDosage.value.trim();
+
+            if (!medicineIdVal || !dosageVal) {
+                alert('Please select a medicine and enter the dosage.');
+                return;
+            }
+
+            const selectedOption = formMedicineId.options[formMedicineId.selectedIndex];
+            const medicineTextVal = selectedOption ? selectedOption.text : '';
+
+            const currentItemData = {
+                medicine_id: medicineIdVal,
+                medicineText: medicineTextVal,
+                dosage: dosageVal,
+                frequency: formFrequency.value.trim(),
+                duration: formDuration.value.trim(),
+                instructions: formInstructions.value.trim()
+            };
+
+            const editingId = editingPrescriptionIdInput.value;
+            if (editingId) { // Đang sửa item đã có trong draft
+                const indexToUpdate = draftPrescriptions.findIndex(item => item.draftId == editingId);
+                if (indexToUpdate > -1) {
+                    // Giữ lại draftId cũ, cập nhật các trường khác
+                    draftPrescriptions[indexToUpdate] = { ...draftPrescriptions[indexToUpdate], ...currentItemData };
+                }
+            } else { // Đang thêm mới
+                currentItemData.draftId = 'new_' + (Date.now() + nextDraftIdSuffix++); // ID tạm thời duy nhất cho client
+                draftPrescriptions.push(currentItemData);
+            }
+            renderAndPopulateHidden(); // Render lại bảng và cập nhật input ẩn
+            resetMedicineForm();
+        });
+    }
+
+    // --- SỰ KIỆN CHO NÚT "CANCEL EDIT" ---
+    if (cancelEditBtn && IS_CONSULTING_DOCTOR) {
+        cancelEditBtn.addEventListener('click', resetMedicineForm);
+    }
+
+    // --- SỰ KIỆN CLICK TRÊN BẢNG (EVENT DELEGATION) ---
+    if (currentPrescriptionTableBody && IS_CONSULTING_DOCTOR) {
+        currentPrescriptionTableBody.addEventListener('click', function(e) {
+            const target = e.target;
+            const closestRow = target.closest('tr');
+            if (!closestRow) return;
+            const draftId = closestRow.dataset.draftId;
+
+            if (target.classList.contains('edit-draft-btn')) {
+                const itemToEdit = draftPrescriptions.find(item => item.draftId == draftId);
+                if (itemToEdit) {
+                    editingPrescriptionIdInput.value = itemToEdit.draftId;
+                    formMedicineId.value = itemToEdit.medicine_id;
+                    formDosage.value = itemToEdit.dosage;
+                    formFrequency.value = itemToEdit.frequency;
+                    formDuration.value = itemToEdit.duration;
+                    formInstructions.value = itemToEdit.instructions;
+                    addOrUpdateBtn.textContent = 'Update Medicine';
+                    cancelEditBtn.style.display = 'inline-block';
+                    formMedicineId.focus();
+                }
+            } else if (target.classList.contains('delete-draft-btn')) {
+                if (confirm('Are you sure you want to remove this medicine from the prescription draft?')) {
+                    draftPrescriptions = draftPrescriptions.filter(item => item.draftId != draftId);
+                    renderAndPopulateHidden(); // Render lại bảng và cập nhật input ẩn
+                    resetMedicineForm(); // Reset form nếu đang sửa item vừa xóa
+                }
+            }
+        });
+    }
+});
+</script>

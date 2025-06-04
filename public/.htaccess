@@ -1,0 +1,11 @@
+# public/.htaccess
+RewriteEngine On
+
+# Bỏ qua các file và thư mục đã tồn tại
+RewriteCond %{REQUEST_FILENAME} -s [OR]
+RewriteCond %{REQUEST_FILENAME} -l [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^.*$ - [NC,L]
+
+# Chuyển tất cả các request khác vào index.php
+RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]

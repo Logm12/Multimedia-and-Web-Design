@@ -1,0 +1,19 @@
+# Configuration files
+config.php
+.env
+
+# Vendor directory (if using Composer)
+/vendor/
+
+# IDE and OS specific files
+.idea/
+.vscode/
+*.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+logs/*.log
+
+# Uploads directory (nếu không muốn chia sẻ file upload)
+# /public/uploads/ # Cân nhắc kỹ nếu bạn muốn có sẵn một vài ảnh mẫu
