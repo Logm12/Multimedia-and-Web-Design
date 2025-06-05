@@ -1,73 +1,70 @@
 <?php
 // app/services/MailService.php
 
-// Nạp autoload của Composer nếu bạn dùng Composer
-// Điều này thường được làm ở file bootstrap chính (public/index.php)
-// Nếu chưa, bạn có thể cần: require_once __DIR__ . '/../../vendor/autoload.php';
-
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
+// Ensure Composer autoloader is loaded (usually in public/index.php)
+// require_once __DIR__ . '/../../vendor/autoload.php'; 
+
 class MailService {
     private $mail;
+    private $senderEmail = 'no-reply@yourclinicdomain.com'; // Define as property
+    private $senderName = 'Healthcare System Support';   // Define as property
 
     public function __construct() {
-        $this->mail = new PHPMailer(true); // true để bật exceptions
+        $this->mail = new PHPMailer(true); 
 
-        // Cấu hình Server settings - THAY THẾ BẰNG THÔNG TIN CỦA BẠN
-        // Đây là ví dụ cấu hình cho Gmail. Bạn cần thay đổi cho phù hợp với mail server của bạn.
         try {
-            // $this->mail->SMTPDebug = SMTP::DEBUG_SERVER; // Bật output debug chi tiết (chỉ dùng khi gỡ lỗi)
+            // $this->mail->SMTPDebug = SMTP::DEBUG_SERVER; 
             $this->mail->isSMTP();
-            $this->mail->Host       = 'smtp.gmail.com'; // Đặt SMTP server
+            $this->mail->Host       = 'smtp.gmail.com'; 
             $this->mail->SMTPAuth   = true;
-            $this->mail->Username   = 'duykhoadd1@gmail.com'; // SMTP username (email của bạn)
-            $this->mail->Password   = 'kpambwxhyjfmodyg';      // SMTP password (Mật khẩu ứng dụng Gmail nếu dùng Gmail)
-            $this->mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;    // Bật mã hóa TLS ngầm; `PHPMailer::ENCRYPTION_STARTTLS` cũng được chấp nhận
-            $this->mail->Port       = 465;                          // Port TCP để kết nối; dùng 587 nếu bạn đặt `SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS`
+            $this->mail->Username   = 'duykhoadd1@gmail.com'; 
+            $this->mail->Password   = 'kpambwxhyjfmodyg';      
+            $this->mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;    
+            $this->mail->Port       = 465;                          
 
-            // Cấu hình UTF-8
             $this->mail->CharSet = 'UTF-8';
+
+            // Set sender from properties
+            $this->mail->setFrom($this->senderEmail, $this->senderName);
+
 
         } catch (Exception $e) {
             error_log("MailService PHPMailer could not be configured. Mailer Error: {$this->mail->ErrorInfo}");
-            // Bạn có thể ném lại exception hoặc xử lý theo cách khác
         }
     }
 
     /**
-     * Gửi email chào mừng với thông tin tài khoản
-     * @param string $toEmail Địa chỉ email người nhận
-     * @param string $fullName Tên đầy đủ của người nhận
-     * @param string $username Tên đăng nhập
-     * @param string $tempPassword Mật khẩu tạm thời
-     * @param string $role Vai trò của người dùng
-     * @return bool True nếu gửi thành công, false nếu thất bại
+     * Sends a welcome email with account details.
+     * @param string $toEmail Recipient's email address.
+     * @param string $fullName Recipient's full name.
+     * @param string $username Login username.
+     * @param string $tempPassword Temporary password.
+     * @param string $role User's role.
+     * @return bool True if sent successfully, false otherwise.
      */
     public function sendWelcomeEmail($toEmail, $fullName, $username, $tempPassword, $role) {
         try {
-            // Người gửi
-            $this->mail->setFrom('no-reply@yourclinicdomain.com', 'Healthcare System Admin'); // Thay thế bằng email và tên người gửi của bạn
-
-            // Người nhận
+            $this->mail->clearAddresses(); // Clear previous recipients
             $this->mail->addAddress($toEmail, $fullName);
 
-            // Nội dung
-            $this->mail->isHTML(true); // Đặt định dạng email là HTML
+            $this->mail->isHTML(true); 
             $this->mail->Subject = 'Welcome to Our Healthcare System - Your Account Details';
 
-            $loginUrl = BASE_URL . '/auth/login'; // Đảm bảo BASE_URL đã được định nghĩa toàn cục
+            $loginUrl = BASE_URL . '/auth/login'; 
 
-            $this->mail->Body    = "Dear {$role} {$fullName},<br><br>" .
-                                 "An account has been created for you on our Healthcare System.<br><br>" .
-                                 "Here are your login details:<br>" .
+            $this->mail->Body    = "<p>Dear {$role} {$fullName},</p>" .
+                                 "<p>An account has been created for you on our Healthcare System.</p>" .
+                                 "<p>Here are your login details:<br>" .
                                  "<strong>Username:</strong> {$username}<br>" .
-                                 "<strong>Temporary Password:</strong> {$tempPassword}<br><br>" .
-                                 "Please log in as soon as possible using the link below and change your password immediately for security reasons.<br>" .
-                                 "Login here: <a href='{$loginUrl}'>{$loginUrl}</a><br><br>" .
-                                 "If you have any questions, please contact our support team.<br><br>" .
-                                 "Thank you,<br>Healthcare System Administration";
+                                 "<strong>Temporary Password:</strong> {$tempPassword}</p>" .
+                                 "<p>Please log in as soon as possible using the link below and change your password immediately for security reasons.<br>" .
+                                 "Login here: <a href='{$loginUrl}'>{$loginUrl}</a></p>" .
+                                 "<p>If you have any questions, please contact our support team.</p>" .
+                                 "<p>Thank you,<br>Healthcare System Administration</p>";
 
             $this->mail->AltBody = "Dear {$role} {$fullName},\n\nAn account has been created for you on our Healthcare System.\n\n" .
                                  "Here are your login details:\n" .
@@ -82,6 +79,42 @@ class MailService {
             return true;
         } catch (Exception $e) {
             error_log("Welcome email could not be sent to {$toEmail}. Mailer Error: {$this->mail->ErrorInfo}");
+            return false;
+        }
+    }
+
+    /**
+     * Sends a password reset email.
+     * @param string $toEmail Recipient's email address.
+     * @param string $fullName Recipient's full name.
+     * @param string $resetLink The unique link to reset the password.
+     * @return bool True if sent successfully, false otherwise.
+     */
+    public function sendPasswordResetEmail($toEmail, $fullName, $resetLink) {
+        try {
+            $this->mail->clearAddresses(); // Clear previous recipients before adding new one
+            $this->mail->addAddress($toEmail, $fullName);
+
+            $this->mail->isHTML(true);
+            $this->mail->Subject = 'Password Reset Request - Healthcare System';
+
+            $this->mail->Body    = "<p>Dear {$fullName},</p>" .
+                                 "<p>We received a request to reset your password for your Healthcare System account.</p>" .
+                                 "<p>If you did not request a password reset, please ignore this email or contact support if you have concerns.</p>" .
+                                 "<p>To reset your password, please click on the link below (or copy and paste it into your browser). This link is valid for 1 hour:</p>" .
+                                 "<p><a href='{$resetLink}'>{$resetLink}</a></p>" .
+                                 "<p>Thank you,<br>Healthcare System Support</p>";
+            
+            $this->mail->AltBody = "Dear {$fullName},\n\nWe received a request to reset your password for your Healthcare System account.\n\n" .
+                                 "If you did not request a password reset, please ignore this email or contact support if you have concerns.\n\n" .
+                                 "To reset your password, please copy and paste the following link into your browser. This link is valid for 1 hour:\n" .
+                                 "{$resetLink}\n\n" .
+                                 "Thank you,\nHealthcare System Support";
+
+            $this->mail->send();
+            return true;
+        } catch (Exception $e) {
+            error_log("Password reset email could not be sent to {$toEmail}. Mailer Error: {$this->mail->ErrorInfo}");
             return false;
         }
     }
