@@ -679,3 +679,39 @@ CREATE TABLE `password_resets` (
   KEY `idx_email` (`Email`), -- Index for email lookup if needed
   CONSTRAINT `fk_password_reset_user` FOREIGN KEY (`UserID`) REFERENCES `Users` (`UserID`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `notifications` (
+  `NotificationID` INT AUTO_INCREMENT PRIMARY KEY,
+  `UserID` INT NOT NULL, -- UserID của người nhận (DoctorID sẽ được lấy từ UserID này)
+  `RelatedEntityID` INT NULL, -- ID của đối tượng liên quan (ví dụ: AppointmentID)
+  `EntityType` VARCHAR(50) NULL, -- Loại của RelatedEntityID (ví dụ: 'appointment')
+  `Type` VARCHAR(100) NOT NULL, -- Loại thông báo (e.g., 'new_appointment_doctor', 'appointment_cancelled_by_patient', 'appointment_updated_by_admin')
+  `Message` TEXT NOT NULL, -- Nội dung chi tiết của thông báo
+  `ShortMessage` VARCHAR(255) NULL, -- Nội dung tóm tắt để hiển thị trong danh sách
+  `Link` VARCHAR(255) NULL, -- Link để nhấp vào xem chi tiết
+  `IsRead` BOOLEAN NOT NULL DEFAULT FALSE,
+  `CreatedAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`UserID`) REFERENCES `Users`(`UserID`) ON DELETE CASCADE
+  -- Không cần RelatedUserID nữa nếu Link đã đủ thông tin
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ALTER TABLE `medicalrecords`
+ADD COLUMN `NursingNotes` TEXT NULL DEFAULT NULL AFTER `NextAppointmentDate`; 
+-- Hoặc đặt ở vị trí khác tùy ý cậu
+CREATE TABLE `leaverequests` (
+  `LeaveRequestID` int(11) NOT NULL AUTO_INCREMENT COMMENT 'Primary Key: Unique ID for the leave request',
+  `DoctorID` int(11) NOT NULL COMMENT 'Foreign Key: Links to doctors.DoctorID',
+  `StartDate` date NOT NULL COMMENT 'Start date of the leave period',
+  `EndDate` date NOT NULL COMMENT 'End date of the leave period',
+  `Reason` text DEFAULT NULL COMMENT 'Reason for the leave request (optional)',
+  `Status` enum('Pending','Approved','Rejected','Cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Pending' COMMENT 'Status of the leave request',
+  `AdminNotes` text DEFAULT NULL COMMENT 'Notes from the admin who reviewed the request (optional)',
+  `RequestedAt` timestamp NOT NULL DEFAULT current_timestamp() COMMENT 'Timestamp when the request was submitted',
+  `ReviewedByUserID` int(11) DEFAULT NULL COMMENT 'Foreign Key: Links to users.UserID (Admin who reviewed)',
+  `ReviewedAt` timestamp NULL DEFAULT NULL COMMENT 'Timestamp when the request was reviewed',
+  PRIMARY KEY (`LeaveRequestID`),
+  KEY `idx_leaverequest_doctor_id` (`DoctorID`),
+  KEY `idx_leaverequest_status` (`Status`),
+  KEY `idx_leaverequest_reviewed_by` (`ReviewedByUserID`),
+  CONSTRAINT `fk_leaverequest_doctor` FOREIGN KEY (`DoctorID`) REFERENCES `doctors` (`DoctorID`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_leaverequest_reviewed_by_user` FOREIGN KEY (`ReviewedByUserID`) REFERENCES `users` (`UserID`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Stores leave requests submitted by doctors';
