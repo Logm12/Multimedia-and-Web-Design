@@ -138,5 +138,21 @@ public function updateDoctorProfile($userId, $data) {
     // Để chắc chắn hơn, bạn có thể kiểm tra rowCount() xem có thực sự update không
     // Hoặc nếu không tìm thấy Doctor với UserID đó để update, có thể coi là lỗi
 }
+    /**
+     * Counts the number of unique patients associated with a doctor through appointments.
+     * This can serve as a proxy for "Followed Patients".
+     * @param int $doctorId The ID of the doctor.
+     * @return int The count of unique patients.
+     */
+    public function getFollowedPatientsCount($doctorId) {
+        $this->db->query("
+            SELECT COUNT(DISTINCT PatientID) as patient_count
+            FROM Appointments
+            WHERE DoctorID = :doctor_id
+        ");
+        $this->db->bind(':doctor_id', $doctorId);
+        $row = $this->db->single();
+        return $row ? (int)$row['patient_count'] : 0;
+    }
 }
 ?>

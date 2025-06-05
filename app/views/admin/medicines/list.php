@@ -1,75 +1,160 @@
 <?php
 // app/views/admin/medicines/list.php
-require_once __DIR__ . '/../../layouts/header.php'; // Hoặc header chung
+
+if (!defined('BASE_URL')) { /* ... BASE_URL definition ... */ }
+$userFullName = $_SESSION['user_fullname'] ?? 'Admin';
+$userAvatar = $_SESSION['user_avatar'] ?? BASE_URL . '/public/assets/img/default_admin_avatar.png';
+// $data = $data ?? [ /* ... existing dummy data ... */ ];
 ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?php echo htmlspecialchars($data['title'] ?? 'Manage Medicines'); ?> - Healthcare System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #343a40; display: flex; min-height: 100vh; }
+        .dashboard-sidebar-cutie { width: 260px; background: linear-gradient(90deg, rgba(10,57,32,1) 0%, rgba(13,142,100,1) 90%); color: #ecf0f1; padding: 25px 0; display: flex; flex-direction: column; }
+        .sidebar-header-cutie { text-align: center; margin-bottom: 30px; padding: 0 20px; }
+        .sidebar-logo-cutie { font-size: 24px; font-weight: 700; color: #fff; text-decoration: none; }
+        .sidebar-nav-cutie ul { list-style: none; }
+        .sidebar-nav-cutie li a { display: flex; align-items: center; padding: 15px 25px; color: #dfe6e9; text-decoration: none; font-size: 15px; font-weight: 500; border-left: 4px solid transparent; transition: all 0.2s ease; }
+        .sidebar-nav-cutie li a:hover, .sidebar-nav-cutie li a.active-nav-cutie { background-color: rgba(255,255,255,0.15); color: #fff; border-left-color: #55efc4; }
+        .sidebar-nav-cutie li a .nav-icon-cutie { margin-right: 12px; font-size: 18px; width: 20px; text-align: center; }
+        .sidebar-footer-cutie { margin-top: auto; padding: 20px 25px; text-align: center; font-size: 13px; color: #bdc3c7; }
 
-<h2><?php echo htmlspecialchars($data['title']); ?></h2>
+        .dashboard-main-content-cutie { flex: 1; padding: 30px; overflow-y: auto; }
+        .main-header-cutie { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 1px solid #dee2e6; }
+        .page-title-header-cutie { display: flex; justify-content: space-between; align-items: center; width: 100%;}
+        .page-title-cutie h2 { font-size: 26px; font-weight: 600; color: #2c3e50; }
+        .page-actions-cutie { display: flex; gap: 10px; }
+        .btn-admin-action, .btn-admin-secondary { padding: 9px 18px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; text-decoration: none; transition: background-color 0.2s ease; }
+        .btn-add-new-item-cutie { background-color: #2ecc71; color: white; }
+        .btn-add-new-item-cutie:hover { background-color: #27ae60; }
+        
+        .user-actions-cutie { display: flex; align-items: center; gap: 20px; margin-left: auto; }
+        .user-actions-cutie .icon-button-cutie { background: none; border: none; font-size: 22px; color: #7f8c8d; cursor: pointer; }
+        .user-profile-cutie { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .user-profile-cutie img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+        .user-profile-cutie span { font-weight: 500; font-size: 15px; color: #0a3920; }
 
-<?php if (isset($_SESSION['admin_medicine_message_success'])): ?>
-    <p class="success-message" style="margin-bottom: 15px; padding:10px; border:1px solid green; background-color:#e6ffe6;">
-        <?php echo $_SESSION['admin_medicine_message_success']; unset($_SESSION['admin_medicine_message_success']); ?>
-    </p>
-<?php endif; ?>
-<?php if (isset($_SESSION['admin_medicine_message_error'])): ?>
-    <p class="error-message" style="margin-bottom: 15px; padding:10px; border:1px solid red; background-color:#ffe0e0;">
-        <?php echo $_SESSION['admin_medicine_message_error']; unset($_SESSION['admin_medicine_message_error']); ?>
-    </p>
-<?php endif; ?>
+        .controls-toolbar-items-cutie { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); flex-wrap: wrap; gap:15px;}
+        .search-area-items-cutie { display: flex; gap: 10px; align-items: center; }
+        .search-area-items-cutie input[type="text"] { padding: 8px 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 14px; min-width: 250px; }
+        .btn-search-items-cutie { background-color: #5dade2; color: white; }
+        .btn-search-items-cutie:hover { background-color: #3498db; }
+        .btn-clear-search-cutie { background-color: #f8f9fa; color: #343a40; border: 1px solid #ced4da; }
+        .btn-clear-search-cutie:hover { background-color: #e9ecef; }
 
-<div class="controls" style="margin-bottom: 20px; padding:10px; border:1px solid #eee; background-color:#f9f9f9; display:flex; justify-content:space-between; align-items:center;">
-    <form method="GET" action="<?php echo BASE_URL; ?>/admin/listMedicines" style="display: flex; gap: 10px;">
-        <input type="text" name="search" value="<?php echo htmlspecialchars($data['currentSearchTerm'] ?? ''); ?>" placeholder="Search by Name, Manufacturer...">
-        <button type="submit" class="btn btn-sm">Search</button>
-        <?php if (!empty($data['currentSearchTerm'])): ?>
-            <a href="<?php echo BASE_URL; ?>/admin/listMedicines" class="btn btn-sm btn-outline-secondary" style="text-decoration:none;">Clear Search</a>
+        .content-table-container-cutie { background-color: #fff; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow-x: auto; padding: 25px; }
+        .content-table-cutie { width: 100%; border-collapse: collapse; }
+        .content-table-cutie th, .content-table-cutie td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ecf0f1; font-size: 14px; }
+        .content-table-cutie th { background-color: #f7f9f9; font-weight: 600; color: #34495e; white-space: nowrap; }
+        .content-table-cutie tbody tr:hover { background-color: #fdfdfe; }
+        .content-table-cutie .description-cell-cutie { max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .action-buttons-admin-table-cutie a, .action-buttons-admin-table-cutie button {
+            padding: 6px 10px; font-size: 13px; border-radius: 5px; text-decoration: none;
+            border: none; cursor: pointer; transition: opacity 0.2s ease; margin-right: 6px; display: inline-block;
+        }
+        .action-buttons-admin-table-cutie a:hover, .action-buttons-admin-table-cutie button:hover { opacity: 0.8; }
+        .btn-edit-item-table-cutie { background-color: #f39c12; color: white; }
+        .btn-delete-item-table-cutie { background-color: #e74c3c; color: white; }
+        
+        .message-cutie { padding: 10px 15px; margin-bottom: 15px; border-radius: 6px; font-size: 14px; }
+        .success-message { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error-message { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .no-items-msg-cutie { text-align: center; padding: 30px; color: #7f8c8d; font-style: italic; }
+        .back-to-dash-link-admin-cutie { display: inline-block; margin-top: 25px; padding: 10px 18px; background-color: #7f8c8d; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; }
+        .back-to-dash-link-admin-cutie:hover { background-color: #6c757d; }
+
+        @media (max-width: 768px) { /* Sidebar responsive */ }
+    </style>
+</head>
+<body>
+    <aside class="dashboard-sidebar-cutie">
+        <div class="sidebar-header-cutie"><a href="<?php echo BASE_URL; ?>" class="sidebar-logo-cutie">HealthSys</a></div>
+        <nav class="sidebar-nav-cutie">
+            <ul>
+                <li><a href="<?php echo BASE_URL; ?>/admin/dashboard" class="<?php echo (strpos($_GET['url'] ?? '', 'admin/dashboard') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">🏠</span>Dashboard</a></li>
+                <li><a href="<?php echo BASE_URL; ?>/admin/listUsers" class="<?php echo (strpos($_GET['url'] ?? '', 'admin/listUsers') !== false || strpos($_GET['url'] ?? '', 'admin/createUser') !== false || strpos($_GET['url'] ?? '', 'admin/editUser') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">👥</span>Manage Users</a></li>
+                <li><a href="<?php echo BASE_URL; ?>/admin/manageSpecializations" class="<?php echo (strpos($_GET['url'] ?? '', 'admin/manageSpecializations') !== false || strpos($_GET['url'] ?? '', 'admin/editSpecialization') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">🏷️</span>Specializations</a></li>
+                <li><a href="<?php echo BASE_URL; ?>/admin/listMedicines" class="<?php echo (strpos($_GET['url'] ?? '', 'admin/listMedicines') !== false || strpos($_GET['url'] ?? '', 'admin/createMedicine') !== false || strpos($_GET['url'] ?? '', 'admin/editMedicine') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">💊</span>Manage Medicines</a></li>
+                <li><a href="<?php echo BASE_URL; ?>/admin/listAllAppointments" class="<?php echo (strpos($_GET['url'] ?? '', 'admin/listAllAppointments') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">🗓️</span>All Appointments</a></li>
+                <li><a href="<?php echo BASE_URL; ?>/report/overview" class="<?php echo (strpos($_GET['url'] ?? '', 'report/overview') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">📊</span>Reports</a></li>
+                <li><a href="<?php echo BASE_URL; ?>/admin/manageLeaveRequests" class="<?php echo (strpos($_GET['url'] ?? '', 'admin/manageLeaveRequests') !== false || strpos($_GET['url'] ?? '', 'admin/reviewLeaveRequest') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">✈️</span>Leave Requests</a></li>
+                <li><a href="<?php echo BASE_URL; ?>/admin/manageFeedbacks" class="<?php echo (strpos($_GET['url'] ?? '', 'admin/manageFeedbacks') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">⭐</span>Patient Feedbacks</a></li>
+                <li><a href="<?php echo BASE_URL; ?>/admin/updateProfile" class="<?php echo (strpos($_GET['url'] ?? '', 'admin/updateProfile') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">👤</span>My Profile</a></li>
+                <!-- Thêm các mục khác cho Admin nếu cần, ví dụ: System Settings -->
+                <!-- <li><a href="<?php echo BASE_URL; ?>/admin/systemSettings" class="<?php echo (strpos($_GET['url'] ?? '', 'admin/systemSettings') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">⚙️</span>System Settings</a></li> -->
+            </ul>
+        </nav>
+        <div class="sidebar-footer-cutie">© <?php echo date('Y'); ?> Healthcare System</div>
+    </aside>
+
+    <main class="dashboard-main-content-cutie">
+        <header class="main-header-cutie">
+            <div class="page-title-cutie"><h2><?php echo htmlspecialchars($data['title'] ?? 'Manage Medicines'); ?></h2></div>
+            <div class="user-actions-cutie">
+                <button class="icon-button-cutie" title="Notifications">🔔</button>
+                <div class="user-profile-cutie">
+                    <img src="<?php echo htmlspecialchars($userAvatar); ?>" alt="Admin Avatar">
+                    <span><?php echo htmlspecialchars($userFullName); ?></span> ▼
+                </div>
+                <a href="<?php echo BASE_URL; ?>/auth/logout" class="icon-button-cutie" title="Logout" style="text-decoration:none;">🚪</a>
+            </div>
+        </header>
+
+        <?php if (isset($_SESSION['admin_medicine_message_success'])): ?>
+            <p class="message-cutie success-message"><?php echo $_SESSION['admin_medicine_message_success']; unset($_SESSION['admin_medicine_message_success']); ?></p>
         <?php endif; ?>
-    </form>
-    <a href="<?php echo BASE_URL; ?>/admin/createMedicine" class="btn btn-success btn-sm" style="background-color:#28a745; text-decoration:none; color:white;">+ Add New Medicine</a>
-</div>
+        <?php if (isset($_SESSION['admin_medicine_message_error'])): ?>
+            <p class="message-cutie error-message"><?php echo $_SESSION['admin_medicine_message_error']; unset($_SESSION['admin_medicine_message_error']); ?></p>
+        <?php endif; ?>
 
-<?php if (!empty($data['medicines'])): ?>
-    <table style="width:100%; border-collapse: collapse;">
-        <thead>
-            <tr style="background-color: #f2f2f2;">
-                <th style="padding: 8px; border: 1px solid #ddd; text-align:left;">#</th>
-                <th style="padding: 8px; border: 1px solid #ddd; text-align:left;">Name</th>
-                <th style="padding: 8px; border: 1px solid #ddd; text-align:left;">Unit</th>
-                <th style="padding: 8px; border: 1px solid #ddd; text-align:left;">Manufacturer</th>
-                <th style="padding: 8px; border: 1px solid #ddd; text-align:left;">Description</th>
-                <th style="padding: 8px; border: 1px solid #ddd; text-align:right;">Stock</th>
-                <th style="padding: 8px; border: 1px solid #ddd; text-align:left;">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php $stt = 1; // Khởi tạo số thứ tự ảo ?>
-            <?php foreach ($data['medicines'] as $medicine): ?>
-                <tr>
-                    <td style="padding: 8px; border: 1px solid #ddd;"><?php echo $stt++; ?></td>
-                    <td style="padding: 8px; border: 1px solid #ddd;"><?php echo htmlspecialchars($medicine['Name']); ?></td>
-                    <td style="padding: 8px; border: 1px solid #ddd;"><?php echo htmlspecialchars($medicine['Unit']); ?></td>
-                    <td style="padding: 8px; border: 1px solid #ddd;"><?php echo htmlspecialchars($medicine['Manufacturer'] ?? 'N/A'); ?></td>
-                    <td style="padding: 8px; border: 1px solid #ddd;"><?php echo nl2br(htmlspecialchars($medicine['Description'] ?? 'N/A')); ?></td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align:right;"><?php echo htmlspecialchars($medicine['StockQuantity']); ?></td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">
-                        <a href="<?php echo BASE_URL . '/admin/editMedicine/' . $medicine['MedicineID']; ?>" class="btn btn-sm btn-info" style="background-color:#17a2b8; text-decoration:none; color:white; padding:3px 6px; margin-right:5px;">Edit</a>
-                        <form action="<?php echo BASE_URL; ?>/admin/deleteMedicine" method="POST" style="display:inline-block;" onsubmit="return confirm('Are you sure you want to delete this medicine? This action cannot be undone if the medicine is not in use.');">
-                            <input type="hidden" name="medicine_id_to_delete" value="<?php echo $medicine['MedicineID']; ?>">
-                            <?php echo generateCsrfInput(); // CSRF Token ?>
-                            <button type="submit" class="btn btn-sm btn-danger" style="background-color:#dc3545; padding:3px 6px;">Delete</button>
-                        </form>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
-<?php else: ?>
-    <p>No medicines found<?php echo !empty($data['currentSearchTerm']) ? ' matching your search "' . htmlspecialchars($data['currentSearchTerm']) . '"' : ''; ?>. <a href="<?php echo BASE_URL; ?>/admin/createMedicine">Add a new one?</a></p>
-<?php endif; ?>
+        <div class="controls-toolbar-items-cutie">
+            <form method="GET" action="<?php echo BASE_URL; ?>/admin/listMedicines" class="search-area-items-cutie">
+                <input type="text" name="search" value="<?php echo htmlspecialchars($data['currentSearchTerm'] ?? ''); ?>" placeholder="Search by Name, Manufacturer...">
+                <button type="submit" class="btn-admin-action btn-search-items-cutie">Search</button>
+                <?php if (!empty($data['currentSearchTerm'])): ?>
+                    <a href="<?php echo BASE_URL; ?>/admin/listMedicines" class="btn-admin-action btn-clear-search-cutie">Clear</a>
+                <?php endif; ?>
+            </form>
+            <a href="<?php echo BASE_URL; ?>/admin/createMedicine" class="btn-admin-action btn-add-new-item-cutie">+ Add New Medicine</a>
+        </div>
 
-<div style="margin-top:20px;">
-    <a href="<?php echo BASE_URL; ?>/admin/dashboard" class="btn btn-secondary" style="background-color:#6c757d; text-decoration:none; color:white;">« Back to Admin Dashboard</a>
-</div>
-
-<?php
-require_once __DIR__ . '/../../layouts/footer.php'; // Hoặc footer chung
-?>
+        <div class="content-table-container-cutie">
+            <?php if (!empty($data['medicines'])): ?>
+                <table class="content-table-cutie">
+                    <thead><tr><th>#</th><th>Name</th><th>Unit</th><th>Manufacturer</th><th>Description</th><th style="text-align:right;">Stock</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        <?php $stt = 1; ?>
+                        <?php foreach ($data['medicines'] as $medicine): ?>
+                            <tr>
+                                <td><?php echo $stt++; ?></td>
+                                <td><?php echo htmlspecialchars($medicine['Name']); ?></td>
+                                <td><?php echo htmlspecialchars($medicine['Unit']); ?></td>
+                                <td><?php echo htmlspecialchars($medicine['Manufacturer'] ?? 'N/A'); ?></td>
+                                <td class="description-cell-cutie" title="<?php echo htmlspecialchars($medicine['Description'] ?? ''); ?>"><?php echo nl2br(htmlspecialchars(substr($medicine['Description'] ?? 'N/A', 0, 70) . (strlen($medicine['Description'] ?? '') > 70 ? '...' : ''))); ?></td>
+                                <td style="text-align:right;"><?php echo htmlspecialchars($medicine['StockQuantity']); ?></td>
+                                <td class="action-buttons-admin-table-cutie">
+                                    <a href="<?php echo BASE_URL . '/admin/editMedicine/' . $medicine['MedicineID']; ?>" class="btn-edit-item-table-cutie">Edit</a>
+                                    <form action="<?php echo BASE_URL; ?>/admin/deleteMedicine" method="POST" style="display:inline-block;" onsubmit="return confirm('Are you sure you want to delete this medicine?');">
+                                        <input type="hidden" name="medicine_id_to_delete" value="<?php echo $medicine['MedicineID']; ?>">
+                                        <?php if (function_exists('generateCsrfInput')) { echo generateCsrfInput(); } ?>
+                                        <button type="submit" class="btn-delete-item-table-cutie">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php else: ?>
+                <p class="no-items-msg-cutie">No medicines found<?php echo !empty($data['currentSearchTerm']) ? ' matching your search "' . htmlspecialchars($data['currentSearchTerm']) . '"' : ''; ?>. <a href="<?php echo BASE_URL; ?>/admin/createMedicine">Add a new one?</a></p>
+            <?php endif; ?>
+        </div>
+        <p style="text-align: center; margin-top:25px;"><a href="<?php echo BASE_URL; ?>/admin/dashboard" class="back-to-dash-link-admin-cutie">« Back to Admin Dashboard</a></p>
+    </main>
+</body>
+</html>
