@@ -667,3 +667,15 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+CREATE TABLE `password_resets` (
+  `ResetID` int(11) NOT NULL AUTO_INCREMENT,
+  `UserID` int(11) NOT NULL,
+  `Email` varchar(255) NOT NULL,
+  `Token` varchar(255) NOT NULL,
+  `ExpiresAt` datetime NOT NULL,
+  `CreatedAt` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`ResetID`),
+  KEY `idx_token` (`Token`), -- Index for faster token lookup
+  KEY `idx_email` (`Email`), -- Index for email lookup if needed
+  CONSTRAINT `fk_password_reset_user` FOREIGN KEY (`UserID`) REFERENCES `Users` (`UserID`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
