@@ -715,3 +715,19 @@ CREATE TABLE `leaverequests` (
   CONSTRAINT `fk_leaverequest_doctor` FOREIGN KEY (`DoctorID`) REFERENCES `doctors` (`DoctorID`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_leaverequest_reviewed_by_user` FOREIGN KEY (`ReviewedByUserID`) REFERENCES `users` (`UserID`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Stores leave requests submitted by doctors';
+
+INSERT INTO `nurses` (`UserID`, `CreatedAt`, `UpdatedAt`)
+SELECT
+    u.`UserID`,
+    u.`CreatedAt`,
+    u.`UpdatedAt` 
+FROM
+    `users` u
+WHERE
+    u.`Role` = 'Nurse'
+AND NOT EXISTS (
+    SELECT 1
+    FROM `nurses` n
+    WHERE n.`UserID` = u.`UserID`
+);
+

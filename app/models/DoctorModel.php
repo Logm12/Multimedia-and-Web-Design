@@ -8,10 +8,6 @@ class DoctorModel {
         $this->db = Database::getInstance();
     }
 
-    /**
-     * Lấy tất cả các bác sĩ đang hoạt động cùng với thông tin chuyên khoa
-     * @return array Danh sách các bác sĩ
-     */
     public function getAllActiveDoctorsWithSpecialization() {
         $this->db->query("
             SELECT
@@ -31,16 +27,11 @@ class DoctorModel {
         return $this->db->resultSet();
     }
 
-    /**
-     * Lấy thông tin chi tiết của một bác sĩ bằng DoctorID
-     * @param int $doctorId
-     * @return array|false // Thay đổi từ object sang array nếu default fetch mode là ASSOC
-     */
     public function getDoctorById($doctorId) {
         $this->db->query("
             SELECT
                 d.DoctorID,
-                d.UserID, -- Thêm UserID để tham chiếu ngược nếu cần
+                d.UserID, 
                 u.FullName AS DoctorName,
                 u.Email AS DoctorEmail,
                 u.PhoneNumber AS DoctorPhone,
@@ -53,33 +44,34 @@ class DoctorModel {
             FROM Doctors d
             JOIN Users u ON d.UserID = u.UserID
             LEFT JOIN Specializations s ON d.SpecializationID = s.SpecializationID
-            WHERE d.DoctorID = :doctorId AND u.Role = 'Doctor' -- Không cần u.Status = 'Active' ở đây nếu chỉ lấy theo DoctorID
-                                                              -- vì DoctorID đã là duy nhất và thuộc về một doctor.
-                                                              -- Trạng thái của User có thể kiểm tra riêng.
+            WHERE d.DoctorID = :doctorId AND u.Role = 'Doctor'
         ");
         $this->db->bind(':doctorId', $doctorId);
-        return $this->db->single(); // Sẽ trả về mảng nếu default fetch mode là ASSOC
+        return $this->db->single(); 
     }
 
-    /**
-     * Lấy thông tin bác sĩ (bao gồm DoctorID) bằng UserID (MỚI THÊM)
-     * @param int $userId ID của người dùng từ bảng Users
-     * @return array|false Thông tin bác sĩ nếu tìm thấy, false nếu không
-     */
     public function getDoctorByUserId($userId) {
-    $this->db->query("
-        SELECT
-            d.DoctorID, d.SpecializationID, d.Bio AS DoctorBio, d.ExperienceYears, d.ConsultationFee,
-            u.UserID, u.FullName, u.Email, u.PhoneNumber, u.Address, u.Avatar, u.PasswordHash, -- <<< THÊM u.Avatar và u.PasswordHash
-            s.Name AS SpecializationName
-        FROM Doctors d
-        JOIN Users u ON d.UserID = u.UserID
-        LEFT JOIN Specializations s ON d.SpecializationID = s.SpecializationID
-        WHERE d.UserID = :user_id AND u.Role = 'Doctor'
-    ");
-    $this->db->bind(':user_id', $userId);
-    return $this->db->single();
-}
+        $this->db->query("
+            SELECT
+                d.DoctorID,
+                d.SpecializationID,
+                d.Bio,
+                d.ExperienceYears,
+                d.ConsultationFee,
+                u.UserID, -- UserID từ bảng Users (chính là $userId truyền vào)
+                u.FullName,
+                u.Email,
+                u.PhoneNumber,
+                u.Address,
+                s.Name AS SpecializationName -- Lấy tên chuyên khoa
+            FROM Doctors d
+            JOIN Users u ON d.UserID = u.UserID
+            LEFT JOIN Specializations s ON d.SpecializationID = s.SpecializationID
+            WHERE d.UserID = :user_id AND u.Role = 'Doctor' -- Đảm bảo user này là Doctor
+        ");
+        $this->db->bind(':user_id', $userId);
+        return $this->db->single(); // Trả về một dòng (dạng mảng nếu PDO::FETCH_ASSOC)
+    }
 
     // Bạn có thể thêm các phương thức khác sau này, ví dụ:
     // createDoctorProfile($userId, $data)
@@ -95,11 +87,11 @@ public function createDoctorProfile($userId, $data) {
     $this->db->query("INSERT INTO Doctors (UserID, SpecializationID, Bio, ExperienceYears, ConsultationFee)
                       VALUES (:user_id, :specialization_id, :bio, :experience_years, :consultation_fee)");
 
-    $this->db->bind(':user_id', $userId);
-    $this->db->bind(':specialization_id', $data['SpecializationID'] ?? null);
-    $this->db->bind(':bio', $data['Bio'] ?? null);
-    $this->db->bind(':experience_years', $data['ExperienceYears'] ?? 0); // Mặc định 0 nếu không có
-    $this->db->bind(':consultation_fee', $data['ConsultationFee'] ?? 0.00); // Mặc định 0.00 nếu không có
+        $this->db->bind(':user_id', $userId);
+        $this->db->bind(':specialization_id', $data['SpecializationID'] ?? null);
+        $this->db->bind(':bio', $data['Bio'] ?? null);
+        $this->db->bind(':experience_years', $data['ExperienceYears'] ?? 0); 
+        $this->db->bind(':consultation_fee', $data['ConsultationFee'] ?? 0.00); 
 
     return $this->db->execute();
 }
@@ -110,85 +102,25 @@ public function createDoctorProfile($userId, $data) {
  * @param array $data Mảng chứa thông tin cập nhật: SpecializationID, Bio, ExperienceYears, ConsultationFee
  * @return bool True nếu cập nhật thành công hoặc không có gì để cập nhật, false nếu lỗi
  */
-// Trong file app/models/DoctorModel.php
+public function updateDoctorProfile($userId, $data) {
+    // Kiểm tra xem doctor profile có tồn tại không, nếu không thì có thể tạo mới hoặc báo lỗi
+    // Hiện tại, chúng ta giả định là update
+    $this->db->query("UPDATE Doctors SET
+                        SpecializationID = :specialization_id,
+                        Bio = :bio,
+                        ExperienceYears = :experience_years,
+                        ConsultationFee = :consultation_fee
+                      WHERE UserID = :user_id");
 
-/**
- * Cập nhật thông tin profile cho Doctor, bao gồm cả thông tin trong bảng 'users' và 'doctors'.
- * Sử dụng Transaction để đảm bảo tính toàn vẹn dữ liệu.
- * @param array $data Mảng chứa tất cả dữ liệu cần cập nhật, bao gồm 'user_id'.
- * @return bool True nếu cập nhật thành công, False nếu thất bại.
- */
-public function updateDoctorProfile(array $data) {
-    // Bắt đầu một transaction
-    // Giả sử $this->db là đối tượng PDO hoặc một lớp wrapper cho PDO
-    $this->db->beginTransaction();
+    $this->db->bind(':specialization_id', $data['SpecializationID'] ?? null);
+    $this->db->bind(':bio', $data['Bio'] ?? null);
+    $this->db->bind(':experience_years', $data['ExperienceYears'] ?? 0);
+    $this->db->bind(':consultation_fee', $data['ConsultationFee'] ?? 0.00);
+    $this->db->bind(':user_id', $userId);
 
-    try {
-        // ===== BƯỚC 1: CẬP NHẬT BẢNG `users` =====
-        
-        // Chuẩn bị câu lệnh SQL cơ bản
-        $userSql = "UPDATE users SET FullName = :full_name, PhoneNumber = :phone_number";
-        
-        // Chuẩn bị các tham số cơ bản
-        $userParams = [
-            ':full_name'    => $data['FullName'],
-            ':phone_number' => $data['PhoneNumber'],
-            ':user_id'      => $data['user_id']
-        ];
-
-        // Chỉ thêm phần cập nhật Avatar nếu có avatar mới được truyền vào
-        if (isset($data['Avatar'])) {
-            $userSql .= ", Avatar = :avatar";
-            $userParams[':avatar'] = $data['Avatar'];
-        }
-
-        // Chỉ thêm phần cập nhật Mật khẩu nếu có mật khẩu mới được truyền vào
-        if (isset($data['NewPassword'])) {
-            $userSql .= ", PasswordHash = :password_hash";
-            $userParams[':password_hash'] = $data['NewPassword'];
-        }
-
-        // Hoàn thiện câu lệnh SQL
-        $userSql .= " WHERE UserID = :user_id";
-
-        // Thực thi câu lệnh cập nhật bảng `users`
-        $this->db->query($userSql);
-        foreach ($userParams as $key => &$val) {
-            $this->db->bind($key, $val);
-        }
-        $this->db->execute();
-
-
-        // ===== BƯỚC 2: CẬP NHẬT BẢNG `doctors` =====
-        
-        $doctorSql = "UPDATE doctors SET 
-                        SpecializationID = :specialization_id, 
-                        ExperienceYears = :experience_years, 
-                        Bio = :doctor_bio 
-                      WHERE UserID = :user_id";
-        
-        $this->db->query($doctorSql);
-        $this->db->bind(':specialization_id', $data['SpecializationID']);
-        $this->db->bind(':experience_years', $data['ExperienceYears']);
-        $this->db->bind(':doctor_bio', $data['DoctorBio']);
-        $this->db->bind(':user_id', $data['user_id']);
-        
-        $this->db->execute();
-
-        // Nếu tất cả các câu lệnh trên chạy thành công, xác nhận các thay đổi
-        $this->db->commit();
-        
-        return true; // Trả về true để báo hiệu thành công
-
-    } catch (PDOException $e) {
-        // Nếu có bất kỳ lỗi nào xảy ra trong khối try, hủy bỏ tất cả các thay đổi
-        $this->db->rollBack();
-        
-        // Ghi lại lỗi để debug (rất quan trọng)
-        error_log("DoctorProfileUpdate_Error: " . $e->getMessage());
-        
-        return false; // Trả về false để báo hiệu thất bại
-    }
+    return $this->db->execute();
+    // Để chắc chắn hơn, bạn có thể kiểm tra rowCount() xem có thực sự update không
+    // Hoặc nếu không tìm thấy Doctor với UserID đó để update, có thể coi là lỗi
 }
     /**
      * Counts the number of unique patients associated with a doctor through appointments.
@@ -205,6 +137,44 @@ public function updateDoctorProfile(array $data) {
         $this->db->bind(':doctor_id', $doctorId);
         $row = $this->db->single();
         return $row ? (int)$row['patient_count'] : 0;
+    }
+
+    // <<<< "SIÊU NĂNG LỰC" MỚI ĐỂ PHỤC VỤ ADMIN CONTROLLER ĐÂY CẬU >>>>
+    public function getAllDoctorsWithDetails() {
+        try {
+            $this->db->query("SELECT 
+                                d.DoctorID, 
+                                u.UserID, 
+                                u.FullName, 
+                                u.Email, 
+                                u.PhoneNumber,
+                                u.Avatar,
+                                u.Status AS UserStatus,
+                                s.Name AS SpecializationName,
+                                d.Bio,
+                                d.ExperienceYears,
+                                d.ConsultationFee,
+                                d.CreatedAt AS DoctorProfileCreatedAt
+                            FROM doctors d
+                            JOIN users u ON d.UserID = u.UserID
+                            LEFT JOIN specializations s ON d.SpecializationID = s.SpecializationID
+                            WHERE u.Role = 'Doctor' 
+                            ORDER BY u.FullName ASC");
+            return $this->db->resultSet();
+        } catch (PDOException $e) {
+            error_log("Error in DoctorModel::getAllDoctorsWithDetails: " . $e->getMessage());
+            return []; 
+        }
+    }
+
+    // Hàm này có thể hữu ích nếu Cậu muốn lấy danh sách bác sĩ đơn giản cho dropdown chẳng hạn
+    public function getAllDoctorsSimple() {
+        $this->db->query("SELECT d.DoctorID, u.FullName 
+                        FROM doctors d
+                        JOIN users u ON d.UserID = u.UserID
+                        WHERE u.Status = 'Active' AND u.Role = 'Doctor'
+                        ORDER BY u.FullName ASC");
+        return $this->db->resultSet();
     }
 }
 ?>

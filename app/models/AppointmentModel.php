@@ -202,59 +202,61 @@ class AppointmentModel {
         return [];
     }
 
-    public function getAppointmentsFilteredForNurse(array $filters = [], array $assignedDoctorIds = []) {
+    public function getAppointmentsFilteredForNurse($filters, array $assignedDoctorIds) {
         if (empty($assignedDoctorIds)) {
             return [];
         }
-        $sqlParams = []; 
-        $sql = "SELECT 
-                    a.AppointmentID, a.AppointmentDateTime, a.ReasonForVisit, a.Status,
-                    pat_user.FullName AS PatientName,
-                    doc_user.FullName AS DoctorName,
-                    doc.DoctorID, 
-                    s.Name AS SpecializationName
-                FROM appointments a
-                JOIN patients pat ON a.PatientID = pat.PatientID
-                JOIN users pat_user ON pat.UserID = pat_user.UserID
-                JOIN doctors doc ON a.DoctorID = doc.DoctorID
-                JOIN users doc_user ON doc.UserID = doc_user.UserID
-                LEFT JOIN specializations s ON doc.SpecializationID = s.SpecializationID
-                WHERE 1=1";
-        $doctorInClausePlaceholders = [];
-        foreach ($assignedDoctorIds as $key => $docId) {
-            $placeholder = ":docIdFilt{$key}";
-            $doctorInClausePlaceholders[] = $placeholder;
-            $sqlParams[$placeholder] = $docId;
-        }
-        $sql .= " AND a.DoctorID IN (" . implode(',', $doctorInClausePlaceholders) . ")";
-        if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
-            $sql .= " AND DATE(a.AppointmentDateTime) BETWEEN :date_from AND :date_to";
-            $sqlParams[':date_from'] = $filters['date_from'];
-            $sqlParams[':date_to'] = $filters['date_to'];
-        } elseif (!empty($filters['date_from'])) {
-            $sql .= " AND DATE(a.AppointmentDateTime) = :date_from";
-            $sqlParams[':date_from'] = $filters['date_from'];
-        } elseif (!empty($filters['date_to'])) {
-             $sql .= " AND DATE(a.AppointmentDateTime) = :date_to";
-            $sqlParams[':date_to'] = $filters['date_to'];
-        }
-        if (!empty($filters['status']) && $filters['status'] !== 'All') {
-            $sql .= " AND a.Status = :status";
-            $sqlParams[':status'] = $filters['status'];
-        }
-        $sql .= " ORDER BY a.AppointmentDateTime ASC";
-        try {
-            $this->db->query($sql);
-            foreach ($sqlParams as $param => $value) {
-                $this->db->bind($param, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
-            }
-            return $this->db->resultSet();
-        } catch (PDOException $e) {
-            error_log("AppointmentModel::getAppointmentsFilteredForNurse Error: " . $e->getMessage());
-        }
-        return [];
-    }
 
+        $sql = "SELECT 
+                    apt.AppointmentID, apt.AppointmentDateTime, apt.ReasonForVisit, apt.Status,
+                    p.FullName AS PatientName,
+                    d.FullName AS DoctorName,
+                    s.Name AS SpecializationName
+                FROM appointments apt
+                JOIN users p ON apt.PatientID = p.UserID
+                JOIN users d ON apt.DoctorID = d.UserID
+                LEFT JOIN doctors doc_profile ON d.UserID = doc_profile.UserID
+                LEFT JOIN specializations s ON doc_profile.SpecializationID = s.SpecializationID
+                WHERE 1=1";
+
+
+        $doctorPlaceholders = [];
+        $params = [];
+        foreach ($assignedDoctorIds as $key => $id) {
+            $placeholder = ":doc_id_{$key}";
+            $doctorPlaceholders[] = $placeholder;
+            $params[$placeholder] = $id;
+        }
+        $sql .= " AND d.UserID IN (" . implode(', ', $doctorPlaceholders) . ")";
+        
+        // Áp dụng các bộ lọc
+        if (!empty($filters['date_from'])) {
+            $sql .= " AND DATE(apt.AppointmentDateTime) >= :date_from";
+            $params[':date_from'] = $filters['date_from'];
+        }
+        if (!empty($filters['date_to'])) {
+            $sql .= " AND DATE(apt.AppointmentDateTime) <= :date_to";
+            $params[':date_to'] = $filters['date_to'];
+        }
+        if (isset($filters['status']) && $filters['status'] !== 'All') {
+            $sql .= " AND apt.Status = :status";
+            $params[':status'] = $filters['status'];
+        }
+        if (isset($filters['doctor_id']) && !empty($filters['doctor_id'])) {
+            $sql .= " AND d.UserID = :doctor_id_filter"; 
+            $params[':doctor_id_filter'] = $filters['doctor_id'];
+        }
+
+        $sql .= " ORDER BY apt.AppointmentDateTime DESC";
+
+        $this->db->query($sql);
+        
+        foreach ($params as $key => $value) {
+            $this->db->bind($key, $value);
+        }
+
+        return $this->db->resultSet();
+    }
     public function getUpcomingAppointmentsForNurseDashboard(array $assignedDoctorIds, $startDate, $endDate, $limit = 10, $statuses = ['Scheduled', 'Confirmed']) {
         if (empty($assignedDoctorIds) || empty($statuses) || !filter_var($limit, FILTER_VALIDATE_INT) || $limit <=0) {
             return [];

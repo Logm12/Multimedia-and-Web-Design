@@ -8,78 +8,162 @@ if (!defined('BASE_URL')) {
     $base_path = ($script_name_dir == '/' || $script_name_dir == '\\') ? '' : rtrim($script_name_dir, '/');
     define('BASE_URL', $protocol . $host . $base_path);
 }
-// $data = $data ?? ['title' => 'Patient Registration', 'input' => [], 'errors' => [], 'error_message' => null, 'success_message' => null];
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
+$data = $data ?? ['title' => 'Patient Registration', 'input' => [], 'errors' => [], 'error_message' => null, 'success_message' => null];
+$csrfToken = '';
+if (function_exists('generateCsrfToken')) {
+    $csrfToken = generateCsrfToken();
+} elseif (isset($_SESSION['csrf_token'])) {
+    $csrfToken = $_SESSION['csrf_token'];
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars($data['title'] ?? 'Patient Registration'); ?> - Healthcare System</title>
+    <title><?php echo htmlspecialchars($data['title'] ?? 'Patient Registration'); ?> - PulseCare</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fc; display: flex; justify-content: center; align-items: flex-start; /* Align top for long forms */ min-height: 100vh; color: #333; padding-top: 30px; padding-bottom: 30px; } /* Added padding top/bottom */
-        .auth-container-wrapper-cutie { display: flex; width: 100%; max-width: 1000px; /* min-height: 650px; */ background-color: #fff; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden; margin-bottom: 30px; /* Margin for scroll */ }
+        body { 
+            font-family: 'Poppins', sans-serif; 
+            background: linear-gradient(135deg, #E0F7FA 0%, #B2EBF2 100%);
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            color: #37474F;
+            padding: 20px;
+        }
+        .auth-container-wrapper-cutie { 
+            display: flex; 
+            width: 100%; 
+            max-width: 950px;
+            background-color: #fff; 
+            border-radius: 16px;
+            box-shadow: 0 15px 40px rgba(0, 77, 64, 0.1);
+            overflow: hidden; 
+        }
         
-        .auth-form-section-cutie { flex: 1; padding: 30px 40px; /* Adjusted padding */ display: flex; flex-direction: column; justify-content: flex-start; /* Align content to top */ }
-        .auth-header-cutie { display: flex; align-items: center; margin-bottom: 20px; } /* Adjusted margin */
-        .auth-logo-placeholder-cutie { width: 36px; height: 36px; background-color: #7c4dff; border-radius: 7px; display: flex; justify-content: center; align-items: center; color: white; font-weight: bold; font-size: 16px; margin-right: 10px; }
-        .auth-hospital-name-cutie { font-size: 18px; font-weight: 600; color: #333; }
+        .auth-form-section-cutie { 
+            flex: 1; 
+            padding: 40px 50px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+        }
+        .auth-header-cutie { 
+            display: flex; 
+            align-items: center; 
+            margin-bottom: 20px;
+        }
+        .auth-logo-img-cutie { 
+            width: 120px;
+            height: auto;
+            margin-right: 15px;
+        }
         
-        .auth-form-section-cutie h1 { font-size: 26px; font-weight: 700; color: #333; margin-bottom: 20px; } /* Adjusted margin */
+        .auth-form-section-cutie h1 { 
+            font-size: 26px;
+            font-weight: 700; 
+            color: #004D40;
+            margin-bottom: 8px; 
+        }
+        .auth-form-section-cutie .form-description-cutie { 
+            font-size: 15px; 
+            color: #546E7A; 
+            margin-bottom: 25px;
+            line-height: 1.6; 
+        }
         
-        .form-grid-cutie { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; } /* Grid for two columns */
-        .form-group-cutie { margin-bottom: 15px; text-align: left; } /* Adjusted margin */
-        .form-group-cutie.full-width-cutie { grid-column: 1 / -1; } /* For elements spanning full width */
-
-        .form-group-cutie label { display: block; font-size: 13px; color: #555; margin-bottom: 6px; font-weight: 500; } /* Adjusted font size */
-        .form-group-cutie input[type="text"], .form-group-cutie input[type="email"], .form-group-cutie input[type="password"], .form-group-cutie input[type="date"], .form-group-cutie textarea, .form-group-cutie select {
-            width: 100%; padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 7px; font-size: 14px; color: #333; /* Adjusted padding/font */
+        .form-grid-cutie {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0 20px;
+        }
+        .form-group-cutie { margin-bottom: 15px; text-align: left; }
+        .form-group-cutie.full-width-cutie { grid-column: 1 / -1; }
+        .form-group-cutie label { display: block; font-size: 14px; color: #37474F; margin-bottom: 6px; font-weight: 500; }
+        .form-group-cutie input, .form-group-cutie select, .form-group-cutie textarea {
+            width: 100%; padding: 10px 14px; border: 1px solid #B0BEC5; border-radius: 8px; font-size: 14px; color: #37474F;
             transition: border-color 0.3s ease, box-shadow 0.3s ease;
         }
-        .form-group-cutie textarea { min-height: 70px; resize: vertical; } /* Adjusted height */
-        .form-group-cutie input:focus, .form-group-cutie textarea:focus, .form-group-cutie select:focus { outline: none; border-color: #7c4dff; box-shadow: 0 0 0 3px rgba(124, 77, 255, 0.2); }
+        .form-group-cutie textarea { min-height: 70px; resize: vertical; }
+        .form-group-cutie input:focus, .form-group-cutie select:focus, .form-group-cutie textarea:focus { 
+            outline: none; border-color: #00796B;
+            box-shadow: 0 0 0 3px rgba(0, 121, 107, 0.2); 
+        }
         
         .btn-auth-primary-cutie {
-            background-color: #7c4dff; color: white; border: none; padding: 12px 20px; font-size: 15px; font-weight: bold; /* Adjusted padding/font */
-            border-radius: 8px; cursor: pointer; width: 100%; text-transform: uppercase; letter-spacing: 0.5px;
-            transition: background-color 0.3s ease, transform 0.2s ease; margin-top: 15px; /* Adjusted margin */
+            background-color: #00796B;
+            color: white; border: none; padding: 14px 20px; font-size: 16px; font-weight: 600;
+            border-radius: 8px; cursor: pointer; width: 100%; text-transform: uppercase; letter-spacing: 0.8px;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            margin-top: 15px;
         }
-        .btn-auth-primary-cutie:hover { background-color: #651fff; transform: translateY(-2px); }
+        .btn-auth-primary-cutie:hover { background-color: #004D40; transform: translateY(-2px); }
         
-        .message-box-cutie { padding: 10px 15px; margin-bottom: 15px; border-radius: 7px; font-size: 13px; text-align: left; border-width: 1px; border-style: solid; } /* Adjusted */
-        .error-message-cutie { background-color: #ffebee; color: #c62828; border-color: #ef9a9a; }
-        .success-message-cutie { background-color: #e8f5e9; color: #2e7d32; border-color: #a5d6a7; }
-        .error-text-cutie { color: #d32f2f; font-size: 11px; margin-top: 4px; } /* Adjusted */
+        .message-box-cutie { padding: 12px 15px; margin-bottom: 20px; border-radius: 8px; font-size: 14px; text-align: left; border-width: 1px; border-style: solid; }
+        .error-message-cutie { background-color: #FFEBEE; color: #C62828; border-color: #FFCDD2; }
+        .success-message-cutie { background-color: #E8F5E9; color: #2E7D32; border-color: #C8E6C9; }
+        .error-text-cutie { color: #D32F2F; font-size: 12px; margin-top: 5px; }
         
-        .auth-alternative-link-cutie { margin-top: 20px; text-align: center; font-size: 13px; } /* Adjusted */
-        .auth-alternative-link-cutie a { color: #7c4dff; text-decoration: none; font-weight: 500; }
+        .auth-alternative-link-cutie { margin-top: 20px; text-align: center; font-size: 14px; color: #455A64; }
+        .auth-alternative-link-cutie a { color: #00796B; text-decoration: none; font-weight: 600; }
         .auth-alternative-link-cutie a:hover { text-decoration: underline; }
 
         .auth-decorative-section-cutie {
-            flex: 1; background-color: #ede7f6;
-            background-image: radial-gradient(#d1c4e9 1px, transparent 1px); background-size: 15px 15px;
-            display: flex; justify-content: center; align-items: center; position: relative; overflow: hidden;
-            min-height: 650px; /* Ensure it has some height even if form is shorter */
+            flex: 1.2;
+            background: linear-gradient(to bottom right, #4DB6AC, #26A69A);
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            position: relative; 
+            overflow: hidden;
+            padding: 40px;
         }
-        .deco-card-stack-cutie { position: relative; width: 280px; height: 350px; }
-        .deco-card-cutie {
-            position: absolute; border-radius: 15px; background-color: rgba(255,255,255,0.6);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1); backdrop-filter: blur(5px);
-            display: flex; justify-content: center; align-items: center; font-size: 14px; color: #555;
+        .decorative-content-cutie {
+            text-align: center;
+            color: white;
         }
-        .deco-card-cutie.c1 { width: 220px; height: 300px; background-color: #e3f2fd; top: 0; left: 30px; z-index: 1; transform: rotate(-5deg); }
-        .deco-card-cutie.c2 { width: 250px; height: 280px; background-color: #e0f2f1; top: 50px; left: 0; z-index: 2; transform: rotate(8deg); }
-        .deco-card-cutie.c3 { width: 200px; height: 250px; background-color: #fff3e0; top: 80px; left: 50px; z-index: 3; transform: rotate(-3deg); }
-        .deco-card-cutie img { max-width: 80%; max-height: 80%; opacity: 0.7; }
+        .decorative-content-cutie img {
+            max-width: 80%;
+            height: auto;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+        .decorative-content-cutie h2 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            line-height: 1.3;
+        }
+        .decorative-content-cutie p {
+            font-size: 16px;
+            line-height: 1.7;
+            max-width: 400px;
+            margin: 0 auto;
+            opacity: 0.9;
+        }
 
-        @media (max-width: 850px) { /* Adjusted breakpoint for better form layout */
-            .form-grid-cutie { grid-template-columns: 1fr; } /* Single column for smaller screens */
-        }
-        @media (max-width: 768px) {
+        @media (max-width: 850px) {
             .auth-container-wrapper-cutie { flex-direction: column; max-width: 500px; min-height: auto; }
-            .auth-decorative-section-cutie { display: none; }
+            .auth-decorative-section-cutie { 
+                min-height: 300px;
+                flex: unset;
+                order: -1;
+            }
+            .decorative-content-cutie img { max-width: 60%; margin-bottom: 20px;}
+            .decorative-content-cutie h2 { font-size: 22px; }
+            .decorative-content-cutie p { font-size: 14px; }
             .auth-form-section-cutie { padding: 30px; }
+            .form-grid-cutie { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -87,11 +171,11 @@ if (!defined('BASE_URL')) {
     <div class="auth-container-wrapper-cutie">
         <div class="auth-form-section-cutie">
             <div class="auth-header-cutie">
-                <div class="auth-logo-placeholder-cutie">L</div>
-                <span class="auth-hospital-name-cutie">Hospital's Name</span>
+                <img src="<?php echo BASE_URL; ?>/assets/images/pulsecare_logo.png" alt="PulseCare Logo" class="auth-logo-img-cutie">
             </div>
 
-            <h1>Create Patient Account</h1>
+            <h1>Join Our Community</h1>
+            <p class="form-description-cutie">Create your account to manage your health with us.</p>
 
             <?php if (isset($data['error_message']) && $data['error_message']): ?>
                 <p class="message-box-cutie error-message-cutie"><?php echo htmlspecialchars($data['error_message']); ?></p>
@@ -101,7 +185,7 @@ if (!defined('BASE_URL')) {
             <?php endif; ?>
 
             <form action="<?php echo htmlspecialchars(BASE_URL . '/patient/register'); ?>" method="POST" novalidate>
-                <?php if (function_exists('generateCsrfInput')) { echo generateCsrfInput(); } ?>
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                 
                 <div class="form-grid-cutie">
                     <div class="form-group-cutie">
@@ -164,17 +248,17 @@ if (!defined('BASE_URL')) {
                     </div>
                 </div> 
                 
-                <button type="submit" class="btn-auth-primary-cutie">Register</button>
+                <button type="submit" class="btn-auth-primary-cutie">Create Account</button>
             </form>
             <p class="auth-alternative-link-cutie">
                 Already have an account? <a href="<?php echo htmlspecialchars(BASE_URL . '/auth/login'); ?>">Login Here</a>
             </p>
         </div>
         <div class="auth-decorative-section-cutie">
-             <div class="deco-card-stack-cutie">
-                <div class="deco-card-cutie c1"><span>Join Our Community</span></div>
-                <div class="deco-card-cutie c2"><span>Easy Registration</span></div>
-                <div class="deco-card-cutie c3"><img src="https://via.placeholder.com/120?text=Welcome" alt="Decorative Image"></div>
+             <div class="decorative-content-cutie">
+                <img src="<?php echo BASE_URL; ?>/assets/images/doctor_login_image.png" alt="Professional Doctor">
+                <h2>Taking care of your health is our top priority.</h2>
+                <p>Being healthy is more than just not getting sick. It entails mental, physical, and social well-being. It's not just about treatment, it's about healing.</p>
             </div>
         </div>
     </div>
