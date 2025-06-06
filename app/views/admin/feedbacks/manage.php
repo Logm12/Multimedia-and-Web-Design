@@ -63,11 +63,21 @@ if (function_exists('generateCsrfToken')) {
             font-family: 'Inter', sans-serif; background-color: #f0f2f5; 
             color: #343a40; margin: 0; padding: 0; display: flex; min-height: 100vh;
         }
-        .dashboard-sidebar-cutie {
-            width: 260px; background: linear-gradient(135deg, rgba(10,57,32,1) 0%, rgba(13,142,100,1) 90%); 
-            color: #ecf0f1; padding: 25px 0; display: flex; flex-direction: column;
-            height: 100vh; position: fixed; top: 0; left: 0; overflow-y: auto;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.15); z-index: 1000;
+.dashboard-sidebar-cutie {
+            width: 260px; 
+            background-color: rgb(10, 46, 106); 
+            background-image: linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0) 100%);
+            color: #ecf0f1; 
+            padding: 25px 0; 
+            display: flex; 
+            flex-direction: column;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.15);
         }
         .sidebar-header-cutie { text-align: center; margin-bottom: 30px; padding: 0 20px; }
         .sidebar-logo-cutie { font-size: 22px; font-weight: 700; color: #fff; text-decoration: none; letter-spacing: 0.5px; }

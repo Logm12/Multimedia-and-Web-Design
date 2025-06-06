@@ -24,7 +24,88 @@ $nurseSidebarMenu = [ /* ... định nghĩa menu như các view khác ... */ ];
     <style>
         /* CSS chung, sidebar, main-content, content-header, breadcrumb giữ nguyên như các view Nurse khác */
         /* ... (copy CSS từ các file view Nurse trước đó) ... */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Inter', sans-serif; background-color: #f0f2f5; 
+            color: #343a40; margin: 0; padding: 0; display: flex; min-height: 100vh;
+        }
 
+        /* Sidebar Styles */
+.dashboard-sidebar-cutie {
+            width: 260px; 
+            background-color: rgb(10, 46, 106); 
+            background-image: linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0) 100%);
+            color: #ecf0f1; 
+            padding: 25px 0; 
+            display: flex; 
+            flex-direction: column;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.15);
+        }
+        .sidebar-header-cutie { text-align: center; margin-bottom: 30px; padding: 0 20px; }
+        .sidebar-logo-cutie { font-size: 22px; font-weight: 700; color: #fff; text-decoration: none; letter-spacing: 0.5px; }
+        .sidebar-nav-cutie ul { list-style: none; padding: 0; margin: 0; }
+        .sidebar-nav-cutie li a { 
+            display: flex; align-items: center; padding: 14px 25px; 
+            color: #dfe6e9; text-decoration: none; font-size: 15px; 
+            font-weight: 500; border-left: 4px solid transparent; 
+            transition: all 0.25s ease-in-out; 
+        }
+        .sidebar-nav-cutie li a:hover, 
+        .sidebar-nav-cutie li a.active-nav-cutie { 
+            background-color: rgba(255, 255, 255, 0.1); color: #fff; 
+            border-left-color: #55efc4; 
+        }
+        .sidebar-nav-cutie li a .nav-icon-cutie { 
+            margin-right: 15px; font-size: 18px; width: 20px; 
+            text-align: center;
+        }
+        .sidebar-nav-cutie li a.logout-link-cutie { margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-nav-cutie li a.logout-link-cutie:hover { background-color: rgba(231, 76, 60, 0.2); border-left-color: #e74c3c; }
+        .sidebar-footer-cutie { margin-top: auto; padding: 20px 25px; text-align: center; font-size: 13px; color: #bdc3c7; }
+
+        /* Main Content & Topbar Styles */
+        .dashboard-main-content-cutie {
+            flex-grow: 1; margin-left: 260px; 
+            background-color: #f0f2f5; overflow-y: auto;
+        }
+        .topbar-shared-cutie {
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 15px 30px; background-color: #ffffff;
+            border-bottom: 1px solid #e0e0e0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .topbar-title-section-cutie h2 { font-size: 22px; font-weight: 600; color: #2c3e50; margin:0; }
+        .topbar-title-section-cutie p { font-size: 14px; color: #7f8c8d; margin-top: 4px; }
+        .topbar-user-actions-cutie { display: flex; align-items: center; gap: 20px; }
+        .topbar-user-actions-cutie .icon-button-cutie { 
+            background: none; border: none; font-size: 20px; 
+            color: #7f8c8d; cursor: pointer; padding: 5px;
+            transition: color 0.2s ease;
+        }
+        .topbar-user-actions-cutie .icon-button-cutie:hover { color: #0a783c; }
+        .user-profile-toggle-cutie { display: flex; align-items: center; gap: 10px; cursor: pointer; position: relative; }
+        .user-profile-toggle-cutie img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid #e0e0e0; }
+        .user-profile-toggle-cutie span { font-weight: 500; font-size: 14px; color: #0a783c; }
+        .user-profile-dropdown-content-cutie {
+            display: none; position: absolute; top: calc(100% + 5px); right: 0;
+            background-color: #fff; border: 1px solid #ddd;
+            border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 1001; min-width: 160px; overflow: hidden;
+        }
+        .user-profile-dropdown-content-cutie a {
+            display: block; padding: 10px 15px; text-decoration: none;
+            color: #333; font-size: 14px; white-space: nowrap;
+        }
+        .user-profile-dropdown-content-cutie a:hover { background-color: #f5f5f5; }
+        .user-profile-toggle-cutie:hover .user-profile-dropdown-content-cutie,
+        .user-profile-dropdown-content-cutie.active-dropdown-cutie { display: block; }
+
+        .actual-page-content-wrapper-cutie { padding: 30px; }
         .form-container-cutie { /* Style cho container của form */
             background-color: #fff; padding: 30px; border-radius: 10px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.06);

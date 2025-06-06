@@ -316,7 +316,6 @@ if (function_exists('generateCsrfToken')) {
             });
         }
         
-        // Auto-submit form on filter change
         const dateFilter = document.getElementById('date_filter');
         const statusFilter = document.getElementById('status_filter');
         if(dateFilter) {
