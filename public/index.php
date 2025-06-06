@@ -12,6 +12,11 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 
 define('PUBLIC_PATH', __DIR__ . '/');
+// Định nghĩa đường dẫn đến thư mục gốc của dự án (ví dụ: C:\xampp\htdocs\web_final1)
+define('ROOT', dirname(dirname(__FILE__))); 
+
+// Định nghĩa đường dẫn đến thư mục 'app'
+define('APPROOT', ROOT . '/app');
 
 // --- CSRF Token Handling ---
 if (empty($_SESSION['csrf_token'])) {
@@ -101,6 +106,7 @@ if (file_exists($controllerFile)) {
     if (class_exists($controllerName)) {
         $controllerInstance = new $controllerName();
         if (method_exists($controllerInstance, $actionName)) {
+            
             call_user_func_array([$controllerInstance, $actionName], $params);
         } else {
             show_lovely_error("Routing Error", "Action <code>" . htmlspecialchars($actionName, ENT_QUOTES, 'UTF-8') . "</code> not found in controller <code>" . htmlspecialchars($controllerName, ENT_QUOTES, 'UTF-8') . "</code>.");

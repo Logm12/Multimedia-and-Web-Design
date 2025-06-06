@@ -6,7 +6,16 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'Doctor') {
     header('Location: ' . BASE_URL . '/auth/login');
     exit();
 }
-
+$userFullName = $_SESSION['user_fullname'] ?? 'Valued Doctor';
+$currentAvatarPath = $_SESSION['user_avatar'] ?? null; // Get from session first
+$avatarSrc = BASE_URL . '/assets/images/default_avatar.png'; // Default
+if (!empty($currentAvatarPath) && $currentAvatarPath !== 'default_avatar.png') {
+    if (filter_var($currentAvatarPath, FILTER_VALIDATE_URL)) {
+        $avatarSrc = htmlspecialchars($currentAvatarPath);
+    } elseif (file_exists(PUBLIC_PATH . $currentAvatarPath)) {
+         $avatarSrc = BASE_URL . '/' . htmlspecialchars($currentAvatarPath);
+    }
+}
 $currentUrlForMenu = $_GET['url'] ?? ''; 
 $urlPartsForMenu = explode('/', rtrim($currentUrlForMenu, '/'));
 $currentControllerForMenu = $urlPartsForMenu[0] ?? '';
@@ -80,11 +89,11 @@ $doctorSidebarMenu = [
         }
     ],
     [
-        'url' => '/doctor/updateProfile', 
+        'url' => '/doctor/updateprofile', 
         'icon' => '👤', 
         'text' => 'Update Profile', 
         'active_logic' => function($url) {
-            return (strpos($url, 'doctor/updateProfile') !== false);
+            return (strpos($url, 'doctor/updateprofile') !== false);
         }
     ],
 ];
@@ -96,13 +105,15 @@ $doctorSidebarMenu = [
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($data['title'] ?? 'Doctor Dashboard'); ?> - Healthcare System</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Include Chart.js -->
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #343a40; display: flex; min-height: 100vh; }
 
         .dashboard-sidebar-cutie {
-            width: 260px; background-color: #2c3e50; /* Dark blue/grey */ color: #ecf0f1;
+           width: 260px; background-color:rgb(10,46,106); color: #fff;
             padding: 25px 0; display: flex; flex-direction: column;
         }
         .sidebar-header-cutie { text-align: center; margin-bottom: 30px; padding: 0 20px; }
@@ -123,11 +134,126 @@ $doctorSidebarMenu = [
         .main-header-cutie { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #dee2e6; }
         .welcome-message-cutie h2 { font-size: 26px; font-weight: 600; color: #2c3e50; }
         .welcome-message-cutie p { font-size: 15px; color: #7f8c8d; margin-top: 4px; }
-        .user-actions-cutie { display: flex; align-items: center; gap: 20px; }
-        .user-actions-cutie .icon-button-cutie { background: none; border: none; font-size: 22px; color: #7f8c8d; cursor: pointer; }
-        .user-profile-cutie { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-        .user-profile-cutie img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
-        .user-profile-cutie span { font-weight: 500; font-size: 15px; color: #34495e; }
+       /* Container chung cho các hành động của user */
+.user-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px; /* Khoảng cách giữa các phần tử */
+}
+
+/* Style cho các nút icon như chuông thông báo */
+.icon-button {
+    background: none;
+    border: none;
+    font-size: 20px; /* Kích thước icon lớn hơn một chút */
+    color: #6c757d;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+.icon-button:hover {
+    background-color: #f1f3f5;
+    color: #343a40;
+}
+
+/* --- Phần Dropdown Profile --- */
+.profile-dropdown {
+    position: relative; /* Quan trọng để định vị menu con */
+}
+
+/* Nút bấm để mở menu */
+.profile-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    background-color: transparent;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 20px;
+    transition: background-color 0.2s ease;
+}
+.profile-trigger:hover {
+    background-color: #e9ecef;
+}
+
+.profile-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.profile-name {
+    font-weight: 500;
+    font-size: 15px;
+    color: #495057;
+}
+
+.dropdown-arrow {
+    font-size: 12px;
+    color: #6c757d;
+}
+
+/* Menu dropdown con */
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 10px); /* Vị trí dưới nút trigger, có khoảng cách 10px */
+    right: 0;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 5px 25px rgba(0,0,0,0.1);
+    min-width: 200px; /* Độ rộng tối thiểu */
+    z-index: 1000;
+    border: 1px solid #e9ecef;
+    padding: 8px 0;
+    overflow: hidden;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* Trạng thái ẩn của menu (dùng cho JS) */
+.dropdown-menu.hidden {
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none; /* Không thể click khi đang ẩn */
+}
+
+/* Các mục trong menu */
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    font-size: 14px;
+    color: #495057;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+}
+.dropdown-item i {
+    width: 16px; /* Căn chỉnh icon */
+    text-align: center;
+    color: #868e96;
+}
+.dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+
+/* Mục logout có màu đỏ để nhấn mạnh */
+.dropdown-item-logout:hover {
+    background-color: #fff5f5;
+    color: #e03131;
+}
+.dropdown-item-logout:hover i {
+    color: #e03131;
+}
+
+/* Đường kẻ phân cách */
+.dropdown-divider {
+    height: 1px;
+    background-color: #e9ecef;
+    margin: 8px 0;
+}
 
         .quick-stats-doctor-cutie { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card-doctor-cutie { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.07); text-align: center; }
@@ -154,9 +280,9 @@ $doctorSidebarMenu = [
     </style>
 </head>
 <body>
-<aside class="dashboard-sidebar-cutie" style="background-color: #2c3e50; color: #ecf0f1;">
+<aside class="dashboard-sidebar-cutie">
     <div class="sidebar-header-cutie">
-        <a href="<?php echo BASE_URL; ?>/doctor/dashboard" class="sidebar-logo-cutie">HealthSys</a>
+        <a href="<?php echo BASE_URL; ?>/doctor/dashboard" class="sidebar-logo-cutie">PulseCare</a>
     </div>
     <nav class="sidebar-nav-cutie">
         <ul>
@@ -178,11 +304,6 @@ $doctorSidebarMenu = [
                     </a>
                 </li>
             <?php endforeach; ?>
-            <li>
-                <a href="<?php echo BASE_URL; ?>/auth/logout" class="logout-link-cutie" style="color: #bdc3c7;">
-                    <span class="nav-icon-cutie">🚪</span>Logout
-                </a>
-            </li>
         </ul>
     </nav>
     <div class="sidebar-footer-cutie" style="color: #7f8c8d;">
@@ -193,14 +314,37 @@ $doctorSidebarMenu = [
     <main class="dashboard-main-content-cutie">
         <header class="main-header-cutie">
             <div class="welcome-message-cutie"><h2>Doctor Dashboard</h2><p><?php echo htmlspecialchars($welcomeMessage); ?></p></div>
-            <div class="user-actions-cutie">
-                <button class="icon-button-cutie" title="Notifications">🔔</button>
-                <div class="user-profile-cutie">
-                    <img src="<?php echo htmlspecialchars($userAvatar); ?>" alt="User Avatar">
-                    <span>Dr. <?php echo htmlspecialchars($_SESSION['user_fullname'] ?? ''); ?></span> ▼
-                </div>
-                <a href="<?php echo BASE_URL; ?>/auth/logout" class="icon-button-cutie" title="Logout" style="text-decoration:none;">🚪</a>
-            </div>
+                   <div class="user-actions">
+    <!-- Nút thông báo với icon từ Font Awesome -->
+    <button class="icon-button" title="Notifications">
+        <i class="fas fa-bell"></i>
+    </button>
+
+    <!-- Khu vực profile, bao gồm cả trigger và menu dropdown -->
+    <div class="profile-dropdown">
+        <!-- Phần này là nút bấm để mở menu -->
+        <button class="profile-trigger" id="profileDropdownTrigger">
+            <img src="<?php echo htmlspecialchars($avatarSrc); ?>" alt="User Avatar" class="profile-avatar">
+            <span class="profile-name">Dr.<?php echo htmlspecialchars($userFullName); ?></span>
+            <i class="fas fa-caret-down dropdown-arrow"></i>
+        </button>
+
+        <!-- Menu dropdown, mặc định sẽ bị ẩn -->
+        <div class="dropdown-menu hidden" id="profileDropdownMenu">
+            <a href="<?php echo BASE_URL; ?>/doctor/updateprofile" class="dropdown-item">
+                <i class="fas fa-user-circle"></i> My Profile
+            </a>
+            <a href="#" class="dropdown-item">
+                <i class="fas fa-cog"></i> Settings
+            </a>
+            <div class="dropdown-divider"></div>
+            <a href="<?php echo BASE_URL; ?>/auth/logout" class="dropdown-item dropdown-item-logout">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </div>
+</div>
+            
         </header>
 
         <section class="quick-stats-doctor-cutie">
@@ -228,7 +372,7 @@ $doctorSidebarMenu = [
                         <?php endforeach; ?>
                     </ul>
                 <?php else: ?>
-                    <p class="no-appointments-msg-doctor-cutie">No appointments scheduled for today, Dr. <?php echo htmlspecialchars($_SESSION['user_fullname'] ?? ''); ?>. Enjoy your day!</p>
+                    <p class="no-appointments-msg-doctor-cutie">No appointments scheduled for today,  <?php echo htmlspecialchars($_SESSION['user_fullname'] ?? ''); ?>. Enjoy your day!</p>
                 <?php endif; ?>
             </div>
             <div class="content-panel-doctor-cutie">
@@ -258,6 +402,27 @@ document.addEventListener('DOMContentLoaded', function () {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } // Ensure y-axis shows whole numbers for counts
+            }
+        });
+    }
+});
+</script>
+  <script>
+document.addEventListener('DOMContentLoaded', function() {
+    const trigger = document.getElementById('profileDropdownTrigger');
+    const menu = document.getElementById('profileDropdownMenu');
+
+    if (trigger && menu) {
+        // Sự kiện khi click vào nút trigger
+        trigger.addEventListener('click', function(event) {
+            event.stopPropagation(); // Ngăn sự kiện click lan ra ngoài
+            menu.classList.toggle('hidden');
+        });
+
+        // Sự kiện khi click ra ngoài menu thì đóng menu lại
+        window.addEventListener('click', function(event) {
+            if (!menu.contains(event.target) && !trigger.contains(event.target)) {
+                menu.classList.add('hidden');
             }
         });
     }

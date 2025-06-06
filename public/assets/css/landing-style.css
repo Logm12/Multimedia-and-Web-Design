@@ -31,6 +31,13 @@ body {
     justify-content: space-between;
     align-items: center;
 }
+/* CSS CHO LOGO KHI LÀ ẢNH */
+#main-header .logo img {
+    height: 50px; /* Chiều cao bạn muốn */
+    width: auto;  /* Để chiều rộng tự điều chỉnh */
+    display: block; /* Hoặc inline-block */
+}
+
 
 .logo {
     display: flex;

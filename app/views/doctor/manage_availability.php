@@ -2,8 +2,16 @@
 // app/views/doctor/manage_availability.php
 
 if (!defined('BASE_URL')) { /* ... BASE_URL definition ... */ }
-$userFullName = $_SESSION['user_fullname'] ?? 'Doctor';
-$userAvatar = $_SESSION['user_avatar'] ?? BASE_URL . '/public/assets/img/default_avatar.png';
+$userFullName = $_SESSION['user_fullname'] ?? 'Valued Doctor';
+$currentAvatarPath = $_SESSION['user_avatar'] ?? null; // Get from session first
+$avatarSrc = BASE_URL . '/public/assets/images/default_avatar.png'; // Default
+if (!empty($currentAvatarPath) && $currentAvatarPath !== 'default_avatar.png') {
+    if (filter_var($currentAvatarPath, FILTER_VALIDATE_URL)) {
+        $avatarSrc = htmlspecialchars($currentAvatarPath);
+    } elseif (file_exists(PUBLIC_PATH . $currentAvatarPath)) {
+         $avatarSrc = BASE_URL . '/' . htmlspecialchars($currentAvatarPath);
+    }
+}
 
 // $data = $data ?? [ /* ... existing dummy data ... */ ];
 // $currentMonthYear = $data['currentMonthYear'] ?? date('F Y');
@@ -18,6 +26,8 @@ $userAvatar = $_SESSION['user_avatar'] ?? BASE_URL . '/public/assets/img/default
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- FullCalendar CSS (You'll need to download/host this or use a CDN) -->
     <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
+           <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #343a40; display: flex; min-height: 100vh; }
@@ -25,7 +35,7 @@ $userAvatar = $_SESSION['user_avatar'] ?? BASE_URL . '/public/assets/img/default
         .dashboard-sidebar-cutie {
             width: 260px; 
             /* MÀU GRADIENT MỚI CỦA CẬU ĐÂY NÈ */
-            background: linear-gradient(90deg, rgba(10,57,32,1) 0%, rgba(13,142,100,1) 90%); 
+            background:rgb(10,46,106);
             color: #ecf0f1; 
             padding: 25px 0; 
             display: flex; 
@@ -81,11 +91,126 @@ $userAvatar = $_SESSION['user_avatar'] ?? BASE_URL . '/public/assets/img/default
         .dashboard-main-content-cutie { flex: 1; padding: 30px; overflow-y: auto; display: flex; flex-direction: column; }
         .main-header-cutie { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 1px solid #dee2e6; }
         .page-title-cutie h2 { font-size: 26px; font-weight: 600; color: #2c3e50; }
-        .user-actions-cutie { display: flex; align-items: center; gap: 20px; }
-        .user-actions-cutie .icon-button-cutie { background: none; border: none; font-size: 22px; color: #7f8c8d; cursor: pointer; }
-        .user-profile-cutie { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-        .user-profile-cutie img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
-        .user-profile-cutie span { font-weight: 500; font-size: 15px; color: #34495e; }
+        /* Container chung cho các hành động của user */
+.user-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px; /* Khoảng cách giữa các phần tử */
+}
+
+/* Style cho các nút icon như chuông thông báo */
+.icon-button {
+    background: none;
+    border: none;
+    font-size: 20px; /* Kích thước icon lớn hơn một chút */
+    color: #6c757d;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+.icon-button:hover {
+    background-color: #f1f3f5;
+    color: #343a40;
+}
+
+/* --- Phần Dropdown Profile --- */
+.profile-dropdown {
+    position: relative; /* Quan trọng để định vị menu con */
+}
+
+/* Nút bấm để mở menu */
+.profile-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    background-color: transparent;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 20px;
+    transition: background-color 0.2s ease;
+}
+.profile-trigger:hover {
+    background-color: #e9ecef;
+}
+
+.profile-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.profile-name {
+    font-weight: 500;
+    font-size: 15px;
+    color: #495057;
+}
+
+.dropdown-arrow {
+    font-size: 12px;
+    color: #6c757d;
+}
+
+/* Menu dropdown con */
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 10px); /* Vị trí dưới nút trigger, có khoảng cách 10px */
+    right: 0;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 5px 25px rgba(0,0,0,0.1);
+    min-width: 200px; /* Độ rộng tối thiểu */
+    z-index: 1000;
+    border: 1px solid #e9ecef;
+    padding: 8px 0;
+    overflow: hidden;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* Trạng thái ẩn của menu (dùng cho JS) */
+.dropdown-menu.hidden {
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none; /* Không thể click khi đang ẩn */
+}
+
+/* Các mục trong menu */
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    font-size: 14px;
+    color: #495057;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+}
+.dropdown-item i {
+    width: 16px; /* Căn chỉnh icon */
+    text-align: center;
+    color: #868e96;
+}
+.dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+
+/* Mục logout có màu đỏ để nhấn mạnh */
+.dropdown-item-logout:hover {
+    background-color: #fff5f5;
+    color: #e03131;
+}
+.dropdown-item-logout:hover i {
+    color: #e03131;
+}
+
+/* Đường kẻ phân cách */
+.dropdown-divider {
+    height: 1px;
+    background-color: #e9ecef;
+    margin: 8px 0;
+}
 
         .availability-layout-cutie { display: flex; gap: 25px; flex-grow: 1; }
         .availability-sidebar-panel-cutie { flex: 0 0 280px; display: flex; flex-direction: column; gap: 20px; }
@@ -140,7 +265,7 @@ $userAvatar = $_SESSION['user_avatar'] ?? BASE_URL . '/public/assets/img/default
 </head>
 <body>
     <aside class="dashboard-sidebar-cutie">
-        <div class="sidebar-header-cutie"><a href="<?php echo BASE_URL; ?>" class="sidebar-logo-cutie">HealthSys</a></div>
+        <div class="sidebar-header-cutie"><a href="<?php echo BASE_URL; ?>" class="sidebar-logo-cutie">PulseCare</a></div>
         <nav class="sidebar-nav-cutie">
             <ul>
                 <li><a href="<?php echo BASE_URL; ?>/doctor/dashboard" class="<?php echo (strpos($_GET['url'] ?? '', 'doctor/dashboard') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">🏠</span>Dashboard</a></li>
@@ -148,8 +273,8 @@ $userAvatar = $_SESSION['user_avatar'] ?? BASE_URL . '/public/assets/img/default
                 <li><a href="<?php echo BASE_URL; ?>/medicalrecord/viewConsultationDetails" class="<?php echo (strpos($_GET['url'] ?? '', 'medicalrecord/viewConsultationDetails') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">📝</span>EMR</a></li>
                 <li><a href="<?php echo BASE_URL; ?>/doctor/manageAvailability" class="<?php echo (strpos($_GET['url'] ?? '', 'doctor/manageAvailability') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">⏱️</span>Manage Availability</a></li>
                 <li><a href="<?php echo BASE_URL; ?>/doctor/patientList" class="<?php echo (strpos($_GET['url'] ?? '', 'doctor/patientList') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">👥</span>Patient List</a></li>
+                <li><a href="<?php echo BASE_URL; ?>/doctor/myLeaveRequests" class="<?php echo (strpos($_GET['url'] ?? '', 'doctor/requestTimeOff') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">✈️</span>My Leave Requests</a></li>
                 <li><a href="<?php echo BASE_URL; ?>/doctor/notifications" class="<?php echo (strpos($_GET['url'] ?? '', 'doctor/notifications') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">🔔</span>Notifications</a></li>
-                <li><a href="<?php echo BASE_URL; ?>/doctor/requestTimeOff" class="<?php echo (strpos($_GET['url'] ?? '', 'doctor/requestTimeOff') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">✈️</span>Request Time Off</a></li>
                 <li><a href="<?php echo BASE_URL; ?>/doctor/updateProfile" class="<?php echo (strpos($_GET['url'] ?? '', 'doctor/updateProfile') !== false) ? 'active-nav-cutie' : ''; ?>"><span class="nav-icon-cutie">👤</span>Update Profile</a></li>
             </ul>
         </nav>
@@ -159,14 +284,36 @@ $userAvatar = $_SESSION['user_avatar'] ?? BASE_URL . '/public/assets/img/default
     <main class="dashboard-main-content-cutie">
         <header class="main-header-cutie">
             <div class="page-title-cutie"><h2><?php echo htmlspecialchars($data['title'] ?? 'Manage Availability'); ?></h2></div>
-            <div class="user-actions-cutie">
-                <button class="icon-button-cutie" title="Notifications">🔔</button>
-                <div class="user-profile-cutie">
-                    <img src="<?php echo htmlspecialchars($userAvatar); ?>" alt="User Avatar">
-                    <span>Dr. <?php echo htmlspecialchars($userFullName); ?></span> ▼
-                </div>
-                <a href="<?php echo BASE_URL; ?>/auth/logout" class="icon-button-cutie" title="Logout" style="text-decoration:none;">🚪</a>
-            </div>
+               <div class="user-actions">
+    <!-- Nút thông báo với icon từ Font Awesome -->
+    <button class="icon-button" title="Notifications">
+        <i class="fas fa-bell"></i>
+    </button>
+
+    <!-- Khu vực profile, bao gồm cả trigger và menu dropdown -->
+    <div class="profile-dropdown">
+        <!-- Phần này là nút bấm để mở menu -->
+        <button class="profile-trigger" id="profileDropdownTrigger">
+            <img src="<?php echo htmlspecialchars($avatarSrc); ?>" alt="User Avatar" class="profile-avatar">
+            <span class="profile-name">Dr.<?php echo htmlspecialchars($userFullName); ?></span>
+            <i class="fas fa-caret-down dropdown-arrow"></i>
+        </button>
+
+        <!-- Menu dropdown, mặc định sẽ bị ẩn -->
+        <div class="dropdown-menu hidden" id="profileDropdownMenu">
+            <a href="<?php echo BASE_URL; ?>/patient/updateProfile" class="dropdown-item">
+                <i class="fas fa-user-circle"></i> My Profile
+            </a>
+            <a href="#" class="dropdown-item">
+                <i class="fas fa-cog"></i> Settings
+            </a>
+            <div class="dropdown-divider"></div>
+            <a href="<?php echo BASE_URL; ?>/auth/logout" class="dropdown-item dropdown-item-logout">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </div>
+</div>
         </header>
 
         <?php if (isset($_SESSION['availability_message_success'])): ?>
@@ -177,16 +324,6 @@ $userAvatar = $_SESSION['user_avatar'] ?? BASE_URL . '/public/assets/img/default
         <?php endif; ?>
 
         <div class="availability-layout-cutie">
-            <div class="availability-sidebar-panel-cutie">
-                <div class="panel-card-cutie">
-                    <h3>Mini Calendar</h3>
-                    <div class="mini-calendar-placeholder-cutie" id="miniCalendar">April 2025 (Placeholder)</div>
-                </div>
-                <div class="panel-card-cutie">
-                    <h3>Search Availability</h3>
-                    <div class="search-appointment-placeholder-cutie">Search (Placeholder)</div>
-                </div>
-            </div>
             <div class="availability-calendar-panel-cutie">
                 <div class="calendar-header-cutie">
                     <div class="calendar-view-buttons-cutie">
@@ -384,5 +521,26 @@ $userAvatar = $_SESSION['user_avatar'] ?? BASE_URL . '/public/assets/img/default
         });
     });
     </script>
+    <script>
+document.addEventListener('DOMContentLoaded', function() {
+    const trigger = document.getElementById('profileDropdownTrigger');
+    const menu = document.getElementById('profileDropdownMenu');
+
+    if (trigger && menu) {
+        // Sự kiện khi click vào nút trigger
+        trigger.addEventListener('click', function(event) {
+            event.stopPropagation(); // Ngăn sự kiện click lan ra ngoài
+            menu.classList.toggle('hidden');
+        });
+
+        // Sự kiện khi click ra ngoài menu thì đóng menu lại
+        window.addEventListener('click', function(event) {
+            if (!menu.contains(event.target) && !trigger.contains(event.target)) {
+                menu.classList.add('hidden');
+            }
+        });
+    }
+});
+</script>
 </body>
 </html>

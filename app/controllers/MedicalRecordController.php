@@ -213,5 +213,66 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
 
 $this->view('medical_record/consultation_details', $data);
 }
+public function getAiSuggestions() {
+    // --- KIỂM TRA BẢO MẬT ---
+    if (session_status() == PHP_SESSION_NONE) session_start();
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'Doctor') {
+        header('Content-Type: application/json');
+        http_response_code(403); // 403 Forbidden
+        echo json_encode(['success' => false, 'message' => 'Unauthorized Access.']);
+        exit;
+    }
+    
+    // --- LẤY DỮ LIỆU TỪ JAVASCRIPT ---
+    $symptoms = $_POST['symptoms'] ?? '';
+    if (empty(trim($symptoms))) {
+        header('Content-Type: application/json');
+        http_response_code(400); // 400 Bad Request
+        echo json_encode(['success' => false, 'message' => 'Symptoms data is required.']);
+        exit;
+    }
+
+    // --- GỌI ĐẾN API PYTHON BẰNG cURL ---
+    $apiUrl = 'http://127.0.0.1:5000/api/predict'; // URL của API Flask
+    $postData = json_encode(['symptoms' => $symptoms]);
+
+    // Khởi tạo cURL
+    $ch = curl_init($apiUrl);
+
+    // Cấu hình cURL
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // Trả về kết quả dưới dạng chuỗi thay vì in ra
+    curl_setopt($ch, CURLOPT_POST, true);           // Sử dụng phương thức POST
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData); // Dữ liệu gửi đi
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [         // Thiết lập header
+        'Content-Type: application/json',
+        'Content-Length: ' . strlen($postData)
+    ]);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5); // Timeout kết nối sau 5 giây
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);      // Timeout toàn bộ request sau 10 giây
+
+    // Thực thi cURL
+    $responseJson = curl_exec($ch);
+    $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+    
+    // --- XỬ LÝ KẾT QUẢ VÀ TRẢ VỀ CHO JAVASCRIPT ---
+    header('Content-Type: application/json');
+
+    if ($responseJson === false) {
+        // Lỗi cURL (ví dụ: không kết nối được server AI)
+        http_response_code(503); // 503 Service Unavailable
+        error_log("cURL Error calling AI API: " . $error);
+        echo json_encode(['success' => false, 'message' => 'Failed to connect to the AI service.']);
+    } elseif ($httpcode !== 200) {
+        // API Python trả về lỗi (ví dụ 400, 500)
+        http_response_code($httpcode);
+        echo $responseJson; // Chuyển tiếp nguyên văn lỗi từ API Python
+    } else {
+        // Thành công!
+        echo $responseJson; // Chuyển tiếp nguyên văn kết quả thành công từ API Python
+    }
+    exit; // Luôn exit sau khi trả về JSON
+}
 }
 ?>

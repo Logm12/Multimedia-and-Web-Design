@@ -17,9 +17,8 @@
     <header id="main-header">
         <div class="container header-container">
             <a href="<?php echo htmlspecialchars($BASE_URL); ?>/" class="logo">
-                <!-- Thay bằng logo của bạn hoặc text -->
-                <i class="fas fa-heartbeat logo-icon"></i> <!-- Ví dụ icon -->
-                <span>AxisCare</span> <!-- Hoặc tên hệ thống của bạn -->
+                <img src="<?php echo htmlspecialchars($BASE_URL); ?>/assets/images/icon.jpg" alt="PulseCare Logo">
+                <span>PulseCare</span> <!-- Hoặc tên hệ thống của bạn -->
             </a>
             <nav id="main-nav">
                 <ul>
@@ -418,12 +417,12 @@
                 <div class="footer-grid">
                     <!-- Cột 1: Thông tin chung -->
                     <div class="footer-column about-column">
-                        <h3 class="footer-logo"><span>Axis</span>Care</h3> <!-- Hoặc logo bằng ảnh -->
+                        <h3 class="footer-logo"><span>Pulse</span>Care</h3> <!-- Hoặc logo bằng ảnh -->
                         <p class="footer-about-text">
                             Providing accessible and efficient healthcare solutions through technology. Our commitment is to your well-being and a seamless medical experience.
                         </p>
                         <ul class="footer-contact-info">
-                            <li><i class="fas fa-envelope"></i> <a href="mailto:info@axiscare.com">info@axiscare.com</a></li>
+                            <li><i class="fas fa-envelope"></i> <a href="mailto:info@axiscare.com">info@pulsecare.com</a></li>
                             <li><i class="fas fa-map-marker-alt"></i> 123 Health St, Wellness City, HC 54321</li>
                         </ul>
                     </div>
@@ -467,7 +466,7 @@
 
         <div class="footer-bottom">
             <div class="container footer-bottom-container">
-                <p class="copyright-text">© <?php echo date('Y'); ?> AxisCare. All Rights Reserved.</p>
+                <p class="copyright-text">© <?php echo date('Y'); ?> PulseCare. All Rights Reserved.</p>
                 <div class="footer-bottom-links">
                     <a href="<?php echo htmlspecialchars($BASE_URL); ?>/terms-conditions">Terms & Conditions</a>
                     <span>|</span>
