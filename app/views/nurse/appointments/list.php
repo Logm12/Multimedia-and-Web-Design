@@ -1,48 +1,61 @@
 <?php
+// app/views/nurse/appointments/list.php
+
 if (session_status() == PHP_SESSION_NONE) session_start();
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'Nurse') {
     header('Location: ' . BASE_URL . '/auth/login');
     exit();
 }
-$currentUrl = $_GET['url'] ?? '';
-// Lấy giá trị filter từ $data['current_filters'] mà controller truyền xuống
-$filterDateFrom = $data['current_filters']['date_from'] ?? ''; // Để trống nếu không có
-$filterDateTo = $data['current_filters']['date_to'] ?? '';   // Để trống nếu không có
-$filterStatus = $data['current_filters']['status'] ?? 'All';
-$allStatuses = $data['all_statuses'] ?? ['All', 'Scheduled', 'Confirmed', 'Completed', 'CancelledByPatient', 'CancelledByClinic', 'NoShow'];
-$appointments = $data['appointments'] ?? [];
+if (!defined('BASE_URL')) { 
+    define('BASE_URL', rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\'));
+}
+if (!defined('PUBLIC_PATH')) {
+    define('PUBLIC_PATH', realpath(dirname(__FILE__) . '/../../../../public'));
+}
 
+// Prepare data for the view
+$currentUser = $data['currentUser'] ?? [];
+$topbarUserFullName = $currentUser['FullName'] ?? $_SESSION['user_fullname'] ?? 'Nurse';
+$topbarUserAvatar = BASE_URL . '/public/assets/img/default_avatar.png'; 
+if (!empty($currentUser['Avatar']) && file_exists(rtrim(PUBLIC_PATH, '/') . '/' . ltrim($currentUser['Avatar'], '/'))) {
+    $topbarUserAvatar = BASE_URL . '/' . ltrim($currentUser['Avatar'], '/');
+}
+
+$pageTitleForTopbar = $data['title'] ?? 'Manage Appointments';
+$welcomeMessageForTopbar = 'View and manage patient appointments assigned to your doctors.';
+$currentUrl = $_GET['url'] ?? 'nurse/listAppointments';
+
+// Filter values
+$filters = $data['current_filters'] ?? [];
+$filterDateFrom = $filters['date_from'] ?? ''; 
+$filterDateTo = $filters['date_to'] ?? '';   
+$filterStatus = $filters['status'] ?? 'All';
+$filterDoctorId = $filters['doctor_id'] ?? '';
+
+// Data for the page content
+$allStatuses = $data['all_statuses'] ?? [];
+$appointments = $data['appointments'] ?? [];
+$assignedDoctors = $data['assigned_doctors'] ?? [];
+
+// Sidebar Menu Definition
 $nurseSidebarMenu = [
     [
-        'url' => '/nurse/dashboard', 
+        'url' => BASE_URL . '/nurse/dashboard', 
         'icon' => '🏠', 
         'text' => 'Dashboard', 
-        'active_logic' => function($url) {
-            $parts = explode('/', rtrim($url, '/'));
-            $controller = $parts[0] ?? '';
-            $action = $parts[1] ?? 'index';
-            return ($controller === 'nurse' && ($action === 'dashboard' || $action === 'index'));
-        }
+        'active_key' => 'nurse/dashboard'
     ],
     [
-        'url' => '/nurse/listAppointments', 
+        'url' => BASE_URL . '/nurse/listAppointments', 
         'icon' => '🗓️', 
         'text' => 'Manage Appointments', 
-        'active_logic' => function($url) {
-            $checks = ['nurse/listAppointments', 'nurse/appointmentDetails', 'nurse/showRecordVitalsForm', 'nurse/saveVitals'];
-            foreach ($checks as $check) {
-                if (strpos($url, $check) !== false) return true;
-            }
-            return false;
-        }
+        'active_key' => ['nurse/listAppointments', 'nurse/appointmentDetails', 'nurse/showRecordVitalsForm', 'nurse/showAddNursingNoteForm']
     ],
     [
-        'url' => '/nurse/updateProfile', 
+        'url' => BASE_URL . '/nurse/updateProfile', 
         'icon' => '👤', 
         'text' => 'My Profile', 
-        'active_logic' => function($url) {
-            return (strpos($url, 'nurse/updateProfile') !== false);
-        }
+        'active_key' => 'nurse/updateProfile'
     ],
 ];
 ?>
@@ -51,15 +64,18 @@ $nurseSidebarMenu = [
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars($data['title'] ?? 'Manage Appointments'); ?> - Nurse Panel</title>
+    <title><?php echo htmlspecialchars($pageTitleForTopbar); ?> - Nurse Panel</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* CSS chung và sidebar giữ nguyên như trước */
+        /* Common Styles */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #343a40; margin: 0; padding: 0; }
-        .page-wrapper-cutie { display: flex; min-height: 100vh; }
+        body { 
+            font-family: 'Inter', sans-serif; background-color: #f0f2f5; 
+            color: #343a40; margin: 0; padding: 0; display: flex; min-height: 100vh;
+        }
 
-        .sidebar-container-cutie {
+        /* Sidebar Styles */
+        .dashboard-sidebar-cutie {
             width: 260px; background: linear-gradient(135deg, rgba(10,57,32,1) 0%, rgba(13,142,100,1) 90%); 
             color: #ecf0f1; padding: 25px 0; display: flex; flex-direction: column;
             height: 100vh; position: fixed; top: 0; left: 0; overflow-y: auto;
@@ -81,51 +97,79 @@ $nurseSidebarMenu = [
         }
         .sidebar-nav-cutie li a .nav-icon-cutie { 
             margin-right: 15px; font-size: 18px; width: 20px; 
-            text-align: center; transition: transform 0.2s ease;
+            text-align: center;
         }
-        .sidebar-nav-cutie li a:hover .nav-icon-cutie { transform: scale(1.1); }
         .sidebar-nav-cutie li a.logout-link-cutie { margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); }
         .sidebar-nav-cutie li a.logout-link-cutie:hover { background-color: rgba(231, 76, 60, 0.2); border-left-color: #e74c3c; }
+        .sidebar-footer-cutie { margin-top: auto; padding: 20px 25px; text-align: center; font-size: 13px; color: #bdc3c7; }
 
-
-        .main-content-area-cutie {
-            flex-grow: 1; padding: 30px; margin-left: 260px; 
+        /* Main Content & Topbar Styles */
+        .dashboard-main-content-cutie {
+            flex-grow: 1; margin-left: 260px; 
             background-color: #f0f2f5; overflow-y: auto;
         }
-        .content-header-cutie { margin-bottom: 25px; }
-        .content-header-cutie h1 { font-size: 1.8em; font-weight: 600; color: #0a783c; margin: 0; }
+        .topbar-shared-cutie {
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 15px 30px; background-color: #ffffff;
+            border-bottom: 1px solid #e0e0e0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .topbar-title-section-cutie h2 { font-size: 22px; font-weight: 600; color: #2c3e50; margin:0; }
+        .topbar-title-section-cutie p { font-size: 14px; color: #7f8c8d; margin-top: 4px; }
+        .topbar-user-actions-cutie { display: flex; align-items: center; gap: 20px; }
+        .topbar-user-actions-cutie .icon-button-cutie { 
+            background: none; border: none; font-size: 20px; 
+            color: #7f8c8d; cursor: pointer; padding: 5px;
+            transition: color 0.2s ease;
+        }
+        .topbar-user-actions-cutie .icon-button-cutie:hover { color: #0a783c; }
+        .user-profile-toggle-cutie { display: flex; align-items: center; gap: 10px; cursor: pointer; position: relative; }
+        .user-profile-toggle-cutie img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid #e0e0e0; }
+        .user-profile-toggle-cutie span { font-weight: 500; font-size: 14px; color: #0a783c; }
+        .user-profile-dropdown-content-cutie {
+            display: none; position: absolute; top: calc(100% + 5px); right: 0;
+            background-color: #fff; border: 1px solid #ddd;
+            border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 1001; min-width: 160px; overflow: hidden;
+        }
+        .user-profile-dropdown-content-cutie a {
+            display: block; padding: 10px 15px; text-decoration: none;
+            color: #333; font-size: 14px; white-space: nowrap;
+        }
+        .user-profile-dropdown-content-cutie a:hover { background-color: #f5f5f5; }
+        .user-profile-toggle-cutie:hover .user-profile-dropdown-content-cutie,
+        .user-profile-dropdown-content-cutie.active-dropdown-cutie { display: block; }
 
+        .actual-page-content-wrapper-cutie { padding: 30px; }
+
+        /* Page Specific Styles */
         .filter-bar-cutie {
             background-color: #fff; padding: 20px; border-radius: 10px;
             margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.06);
         }
-        .filter-bar-cutie .form-inline-cutie { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px; /* Tăng gap */ }
+        .filter-bar-cutie .form-inline-cutie { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px; }
         .filter-bar-cutie .form-group-cutie { display: flex; flex-direction: column; }
         .filter-bar-cutie label { margin-bottom: 5px; font-weight: 500; font-size: 14px; color: #495057; }
         .filter-bar-cutie .form-control-cutie {
             padding: 10px 12px; border: 1px solid #ced4da; border-radius: 6px;
-            font-size: 14px; min-width: 160px; /* Giảm min-width chút cho vừa 2 input date */
+            font-size: 14px; min-width: 160px; 
             transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
         .filter-bar-cutie .form-control-cutie:focus {
             border-color: #10ac84; box-shadow: 0 0 0 0.2rem rgba(16, 172, 132, 0.25); outline: none;
         }
         .filter-bar-cutie .button-filter-cutie {
-            background-color: #10ac84; color: white; border: none;
+            background-color: #0a783c; color: white; border: none;
             padding: 10px 20px; border-radius: 6px; font-size: 14px;
             cursor: pointer; font-weight: 500; transition: background-color 0.2s ease;
-            height: 40px; /* Cho bằng chiều cao input */
+            height: 40px; 
         }
-        .filter-bar-cutie .button-filter-cutie:hover { background-color: #0a783c; }
+        .filter-bar-cutie .button-filter-cutie:hover { background-color: #086330; }
         
-        /* CSS cho các phần khác giữ nguyên như trước */
-        .data-table-container-cutie, .details-container-cutie, .form-container-cutie {
+        .data-table-container-cutie {
             background-color: #fff; padding: 25px; border-radius: 10px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.06);
         }
-        .data-table-container-cutie h3.table-title-cutie,
-        .details-container-cutie h3.details-title-cutie,
-        .form-container-cutie h3.form-title-cutie {
+        .data-table-container-cutie h3.table-title-cutie {
             font-size: 1.3em; font-weight: 600; color: #0a783c;
             margin: 0 0 20px 0; padding-bottom: 10px; border-bottom: 1px solid #eee;
         }
@@ -150,7 +194,6 @@ $nurseSidebarMenu = [
         .status-noshow { background-color: #f39c12; }
         .status-pending { background-color: #f1c40f; color: #333;}
 
-
         .action-button-group-cutie .action-button-cutie {
             padding: 6px 10px; font-size: 13px; border-radius: 5px;
             text-decoration: none; color: #fff; border: none; cursor: pointer;
@@ -170,15 +213,17 @@ $nurseSidebarMenu = [
             font-size: 15px; text-align: center; font-weight: 500;
             border-left: 5px solid #004d40;
         }
-
-        @media (max-width: 992px) { /* Điều chỉnh cho filter bar khi màn hình nhỏ hơn */
-            .filter-bar-cutie .form-inline-cutie { gap: 10px; }
-            .filter-bar-cutie .form-control-cutie { min-width: 140px; }
+        .no-appointments-message-cutie {
+            text-align: center; padding: 30px; color: #7f8c8d; font-style: italic;
         }
+
         @media (max-width: 768px) {
-            .sidebar-container-cutie { width: 100%; height: auto; position: static; padding: 15px 0; }
-            .main-content-area-cutie { margin-left: 0; padding: 20px 15px; }
-            .page-wrapper-cutie { flex-direction: column; }
+            .dashboard-sidebar-cutie { width: 100%; height: auto; position: static; box-shadow: none; }
+            .dashboard-main-content-cutie { margin-left: 0; }
+            .topbar-shared-cutie { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .topbar-title-section-cutie h2 { font-size: 20px; }
+            .topbar-user-actions-cutie { width: 100%; justify-content: flex-end; }
+            .actual-page-content-wrapper-cutie { padding: 20px 15px; }
             .filter-bar-cutie .form-inline-cutie { flex-direction: column; align-items: stretch; }
             .filter-bar-cutie .form-control-cutie { min-width: 0; width: 100%; }
             .filter-bar-cutie .button-filter-cutie { width: 100%; margin-top: 10px; }
@@ -186,155 +231,190 @@ $nurseSidebarMenu = [
     </style>
 </head>
 <body>
-    <div class="page-wrapper-cutie">
-        <aside class="sidebar-container-cutie">
-            <div class="sidebar-header-cutie">
-                <a href="<?php echo BASE_URL; ?>/nurse/dashboard" class="sidebar-logo-cutie">Nurse Panel</a>
-            </div>
-<nav class="sidebar-nav-cutie">
-    <ul>
-        <?php foreach ($nurseSidebarMenu as $item): ?>
-            <?php 
-            $isActive = isset($item['active_logic']) && is_callable($item['active_logic']) 
-                        ? $item['active_logic']($currentUrlForMenu) 
-                        : false; 
-            ?>
-            <li>
-                <a href="<?php echo BASE_URL . htmlspecialchars($item['url']); ?>" class="<?php echo $isActive ? 'active-nav-cutie' : ''; ?>">
-                    <span class="nav-icon-cutie"><?php echo $item['icon']; ?></span><?php echo htmlspecialchars($item['text']); ?>
-                </a>
-            </li>
-        <?php endforeach; ?>
-        <li>
-            <a href="<?php echo BASE_URL; ?>/auth/logout" class="logout-link-cutie">
-                <span class="nav-icon-cutie">🚪</span>Logout
-            </a>
-        </li>
-    </ul>
-</nav>
-        </aside>
-
-        <main class="main-content-area-cutie">
-            <section class="content-header-cutie">
-                <h1><?php echo htmlspecialchars($data['title'] ?? 'Manage Appointments'); ?></h1>
-            </section>
-
-            <section class="content-body-cutie">
-                <div class="filter-bar-cutie">
-                    <form method="GET" action="<?php echo BASE_URL; ?>/nurse/listAppointments" class="form-inline-cutie">
-                        <div class="form-group-cutie">
-                            <label for="date_from">Date From:</label>
-                            <input type="date" id="date_from" name="date_from" class="form-control-cutie" value="<?php echo htmlspecialchars($filterDateFrom); ?>">
-                        </div>
-                        <div class="form-group-cutie">
-                            <label for="date_to">Date To:</label>
-                            <input type="date" id="date_to" name="date_to" class="form-control-cutie" value="<?php echo htmlspecialchars($filterDateTo); ?>">
-                        </div>
-                        <div class="form-group-cutie">
-                            <label for="status">Status:</label>
-                            <select id="status" name="status" class="form-control-cutie">
-                                <?php foreach ($allStatuses as $statusValue): ?>
-                                    <option value="<?php echo htmlspecialchars($statusValue); ?>" <?php echo ($filterStatus == $statusValue) ? 'selected' : ''; ?>>
-                                        <?php echo ucfirst(str_replace(['ByPatient', 'ByClinic'], [' (Patient)', ' (Clinic)'], htmlspecialchars($statusValue))); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <button type="submit" class="button-filter-cutie">Apply Filter</button>
-                    </form>
-                </div>
-                
-                <?php if (isset($_SESSION['info_message'])): ?>
-                    <div class="info-message-cutie">
-                        <?php echo htmlspecialchars($_SESSION['info_message']); unset($_SESSION['info_message']); ?>
-                    </div>
-                <?php endif; ?>
-
-                <div class="data-table-container-cutie">
-                    <h3 class="table-title-cutie">Appointments List</h3>
-                    <div class="table-responsive-cutie">
-                        <table class="table-cutie">
-                            <thead>
-                                <tr>
-                                    <th>Date & Time</th> {/* Thay đổi từ Time thành Date & Time */}
-                                    <th>Patient</th>
-                                    <th>Doctor</th>
-                                    <th>Specialization</th>
-                                    <th>Reason (Summary)</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (!empty($appointments)): ?>
-                                    <?php foreach ($appointments as $appointment): ?>
-                                        <tr>
-                                            {/* Hiển thị cả ngày và giờ */}
-                                            <td><?php echo htmlspecialchars(date('M j, Y H:i A', strtotime($appointment['AppointmentDateTime']))); ?></td>
-                                            <td><?php echo htmlspecialchars($appointment['PatientName']); ?></td>
-                                            <td>Dr. <?php echo htmlspecialchars($appointment['DoctorName']); ?></td>
-                                            <td><?php echo htmlspecialchars($appointment['SpecializationName'] ?? 'N/A'); ?></td>
-                                            <td><?php echo nl2br(htmlspecialchars(substr($appointment['ReasonForVisit'] ?? '', 0, 40))) . (strlen($appointment['ReasonForVisit'] ?? '') > 40 ? '...' : ''); ?></td>
-                                            <td>
-                                                <span class="status-label-cutie status-<?php echo htmlspecialchars(strtolower(str_replace(' ', '', $appointment['Status']))); ?>">
-                                                    <?php echo htmlspecialchars($appointment['Status']); ?>
-                                                </span>
-                                            </td>
-                                            <td class="action-button-group-cutie">
-                                                <a href="<?php echo BASE_URL; ?>/nurse/appointmentDetails/<?php echo $appointment['AppointmentID']; ?>" class="action-button-cutie details" title="View Details">
-                                                    <span class="icon-action-cutie">👁️</span> Details
-                                                </a>
-                                                <a href="<?php echo BASE_URL; ?>/nurse/showRecordVitalsForm/<?php echo $appointment['AppointmentID']; ?>" class="action-button-cutie vitals" title="Record/Edit Vitals">
-                                                    <span class="icon-action-cutie">💓</span> Vitals
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <tr>
-                                        <td colspan="7" style="text-align: center; padding: 20px; color: #777;">No appointments found for the selected criteria.</td>
-                                    </tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-        </main>
-    </div>
-    
-    <?php /* Nếu cậu muốn dùng Litepicker, thêm JS vào đây */ ?>
-    <?php /*
-    <script src="https://cdn.jsdelivr.net/npm/litepicker/dist/litepicker.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            if (document.getElementById('date_from') && document.getElementById('date_to')) {
-                new Litepicker({
-                    element: document.getElementById('date_from'),
-                    elementEnd: document.getElementById('date_to'),
-                    singleMode: false,
-                    allowRepick: true,
-                    format: 'YYYY-MM-DD',
-                    tooltipText: {
-                        one: 'day',
-                        other: 'days'
-                    },
-                    buttonText: {
-                        previousMonth: `<!-- SVG ARROW LEFT -->`,
-                        nextMonth: `<!-- SVG ARROW RIGHT -->`,
-                        reset: `<span title="Clear Dates">Clear</span>`, // Hoặc icon
-                        apply: `Apply`
-                    },
-                    setup: (picker) => {
-                        picker.on('selected', (date1, date2) => {
-                            // Có thể tự động submit form ở đây nếu muốn
-                            // Hoặc để người dùng nhấn nút "Apply Filter"
-                        });
+    <aside class="dashboard-sidebar-cutie">
+        <div class="sidebar-header-cutie">
+            <a href="<?php echo BASE_URL; ?>/nurse/dashboard" class="sidebar-logo-cutie">Nurse Panel</a>
+        </div>
+        <nav class="sidebar-nav-cutie">
+            <ul>
+                <?php foreach ($nurseSidebarMenu as $item): ?>
+                    <?php 
+                    $isActive = false;
+                    if (is_array($item['active_key'])) {
+                        foreach ($item['active_key'] as $key) {
+                            if (strpos($currentUrl, $key) !== false) {
+                                $isActive = true;
+                                break;
+                            }
+                        }
+                    } else {
+                         if (strpos($currentUrl, $item['active_key']) !== false) {
+                            if ($item['active_key'] === 'nurse/dashboard' && ($currentUrl === 'nurse/dashboard' || $currentUrl === 'nurse')) {
+                                $isActive = true;
+                            } elseif ($item['active_key'] !== 'nurse/dashboard') {
+                                $isActive = true;
+                            }
+                        }
                     }
-                });
-            }
-        });
-    </script>
-    */ ?>
+                    ?>
+                    <li>
+                        <a href="<?php echo htmlspecialchars($item['url']); ?>" class="<?php echo $isActive ? 'active-nav-cutie' : ''; ?>">
+                            <span class="nav-icon-cutie"><?php echo $item['icon']; ?></span><?php echo htmlspecialchars($item['text']); ?>
+                        </a>
+                    </li>
+                <?php endforeach; ?>
+                <li>
+                    <a href="<?php echo BASE_URL; ?>/auth/logout" class="logout-link-cutie">
+                        <span class="nav-icon-cutie">🚪</span>Logout
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        <div class="sidebar-footer-cutie">© <?php echo date('Y'); ?> Healthcare System</div>
+    </aside>
+
+    <main class="dashboard-main-content-cutie">
+        <header class="topbar-shared-cutie">
+            <div class="topbar-title-section-cutie">
+                <h2><?php echo htmlspecialchars($pageTitleForTopbar); ?></h2>
+                <p><?php echo htmlspecialchars($welcomeMessageForTopbar); ?></p>
+            </div>
+            <div class="topbar-user-actions-cutie">
+                <button class="icon-button-cutie" title="Notifications" onclick="alert('Notifications (coming soon!)');">🔔</button>
+                <div class="user-profile-toggle-cutie" id="userProfileToggle">
+                    <img src="<?php echo htmlspecialchars($topbarUserAvatar); ?>" alt="Nurse Avatar">
+                    <span><?php echo htmlspecialchars($topbarUserFullName); ?> ▼</span>
+                    <div class="user-profile-dropdown-content-cutie" id="userProfileDropdown">
+                        <a href="<?php echo BASE_URL; ?>/nurse/updateProfile">My Profile</a>
+                        <a href="<?php echo BASE_URL; ?>/auth/logout">Logout</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="actual-page-content-wrapper-cutie">
+            <div class="filter-bar-cutie">
+                <form method="GET" action="<?php echo BASE_URL; ?>/nurse/listAppointments" class="form-inline-cutie">
+                    <div class="form-group-cutie">
+                        <label for="date_from">Date From:</label>
+                        <input type="date" id="date_from" name="date_from" class="form-control-cutie" value="<?php echo htmlspecialchars($filterDateFrom); ?>">
+                    </div>
+                    <div class="form-group-cutie">
+                        <label for="date_to">Date To:</label>
+                        <input type="date" id="date_to" name="date_to" class="form-control-cutie" value="<?php echo htmlspecialchars($filterDateTo); ?>">
+                    </div>
+                    
+                    <?php if (!empty($assignedDoctors)): ?>
+                    <div class="form-group-cutie">
+                        <label for="doctor_id">Doctor:</label>
+                        <select id="doctor_id" name="doctor_id" class="form-control-cutie">
+                            <option value="">All Assigned Doctors</option>
+                            <?php foreach ($assignedDoctors as $doctor): ?>
+                                <option value="<?php echo $doctor['DoctorID']; ?>" <?php echo ($filterDoctorId == $doctor['DoctorID']) ? 'selected' : ''; ?>>
+                                    Dr. <?php echo htmlspecialchars($doctor['FullName']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <div class="form-group-cutie">
+                        <label for="status">Status:</label>
+                        <select id="status" name="status" class="form-control-cutie">
+                            <?php foreach ($allStatuses as $statusValue): ?>
+                                <option value="<?php echo htmlspecialchars($statusValue); ?>" <?php echo ($filterStatus == $statusValue) ? 'selected' : ''; ?>>
+                                    <?php echo ucfirst(str_replace(['ByPatient', 'ByClinic'], [' (Patient)', ' (Clinic)'], htmlspecialchars($statusValue))); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <button type="submit" class="button-filter-cutie">Apply Filter</button>
+                    <a href="<?php echo BASE_URL; ?>/nurse/listAppointments" class="button-filter-cutie" style="background-color: #6c757d;">Clear</a>
+                </form>
+            </div>
+            
+            <?php if (isset($_SESSION['info_message'])): ?>
+                <div class="info-message-cutie">
+                    <?php echo htmlspecialchars($_SESSION['info_message']); unset($_SESSION['info_message']); ?>
+                </div>
+            <?php endif; ?>
+             <?php if (isset($_SESSION['success_message'])): ?>
+                <div class="info-message-cutie" style="background-color: #d4edda; color: #155724; border-left-color: #28a745;">
+                    <?php echo htmlspecialchars($_SESSION['success_message']); unset($_SESSION['success_message']); ?>
+                </div>
+            <?php endif; ?>
+            <?php if (isset($_SESSION['error_message'])): ?>
+                <div class="info-message-cutie" style="background-color: #f8d7da; color: #721c24; border-left-color: #dc3545;">
+                    <?php echo htmlspecialchars($_SESSION['error_message']); unset($_SESSION['error_message']); ?>
+                </div>
+            <?php endif; ?>
+
+            <div class="data-table-container-cutie">
+                <h3 class="table-title-cutie">Appointments List</h3>
+                <div class="table-responsive-cutie">
+                    <table class="table-cutie">
+                        <thead>
+                            <tr>
+                                <th>Date & Time</th>
+                                <th>Patient</th>
+                                <th>Doctor</th>
+                                <th>Specialization</th>
+                                <th>Reason (Summary)</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!empty($appointments)): ?>
+                                <?php foreach ($appointments as $appointment): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars(date('M j, Y H:i A', strtotime($appointment['AppointmentDateTime']))); ?></td>
+                                        <td><?php echo htmlspecialchars($appointment['PatientName']); ?></td>
+                                        <td>Dr. <?php echo htmlspecialchars($appointment['DoctorName']); ?></td>
+                                        <td><?php echo htmlspecialchars($appointment['SpecializationName'] ?? 'N/A'); ?></td>
+                                        <td title="<?php echo htmlspecialchars($appointment['ReasonForVisit'] ?? ''); ?>"><?php echo nl2br(htmlspecialchars(substr($appointment['ReasonForVisit'] ?? '', 0, 40))) . (strlen($appointment['ReasonForVisit'] ?? '') > 40 ? '...' : ''); ?></td>
+                                        <td>
+                                            <span class="status-label-cutie status-<?php echo htmlspecialchars(strtolower(str_replace(' ', '', $appointment['Status']))); ?>">
+                                                <?php echo htmlspecialchars($appointment['Status']); ?>
+                                            </span>
+                                        </td>
+                                        <td class="action-button-group-cutie">
+                                            <a href="<?php echo BASE_URL; ?>/nurse/appointmentDetails/<?php echo $appointment['AppointmentID']; ?>" class="action-button-cutie details" title="View Details">
+                                                <span class="icon-action-cutie">👁️</span> Details
+                                            </a>
+                                            <a href="<?php echo BASE_URL; ?>/nurse/showRecordVitalsForm/<?php echo $appointment['AppointmentID']; ?>" class="action-button-cutie vitals" title="Record/Edit Vitals">
+                                                <span class="icon-action-cutie">💓</span> Vitals
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="7" class="no-appointments-message-cutie">No appointments found for the selected criteria.</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const userProfileToggle = document.getElementById('userProfileToggle');
+        const userProfileDropdown = document.getElementById('userProfileDropdown');
+        if (userProfileToggle && userProfileDropdown) {
+            userProfileToggle.addEventListener('click', function(event) {
+                event.stopPropagation();
+                userProfileDropdown.classList.toggle('active-dropdown-cutie');
+            });
+            document.addEventListener('click', function(event) {
+                if (userProfileDropdown.classList.contains('active-dropdown-cutie') && !userProfileToggle.contains(event.target)) {
+                    userProfileDropdown.classList.remove('active-dropdown-cutie');
+                }
+            });
+        }
+    });
+</script>
 </body>
 </html>

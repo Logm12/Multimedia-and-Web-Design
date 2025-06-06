@@ -14,12 +14,16 @@ class AdminController {
     private $notificationModel;
     private $doctorAvailabilityModel;
     private $backupPath;
-    private $leaveRequestModel; // <<<< THÊM MODEL MỚI NÈ CẬU
+    private $leaveRequestModel;
+    private $nurseModel; 
+    private $doctorNurseAssignmentModel; 
 
     public function __construct() {
         if (session_status() == PHP_SESSION_NONE) {
             session_start();
         }
+
+        require_once __DIR__ . '/../helpers/csrf_helper.php';
         
         $urlPath = $_GET['url'] ?? '';
         $urlParts = explode('/', rtrim($urlPath, '/'));
@@ -49,8 +53,10 @@ class AdminController {
             $this->feedbackModel = new FeedbackModel();
             $this->notificationModel = new NotificationModel();
             $this->doctorAvailabilityModel = new DoctorAvailabilityModel();
-            $this->leaveRequestModel = new LeaveRequestModel(); // <<<< KHỞI TẠO MODEL MỚI
-            $this->backupPath = __DIR__ . '/../storage/backups/';
+            $this->leaveRequestModel = new LeaveRequestModel(); 
+            $this->nurseModel = new NurseModel(); 
+            $this->doctorNurseAssignmentModel = new DoctorNurseAssignmentModel(); 
+            $this->backupPath = __DIR__ . '/../../storage/backups/'; 
         } catch (Error $e) {
             error_log("FATAL: Model initialization error in AdminController: " . $e->getMessage());
             die("A critical error occurred during application setup. Please check logs or contact support. Details: " . htmlspecialchars($e->getMessage()));
@@ -63,36 +69,40 @@ class AdminController {
 
     protected function view($view, $data = []) {
         if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'Admin') {
-            if (strpos($view, 'admin/auth/') === false && $view !== 'admin/login') { // Cho phép các trang auth của admin
+            if (strpos($view, 'admin/auth/') === false && $view !== 'admin/login') { 
                  $_SESSION['error_message'] = "Unauthorized access. Admin login required.";
-                 header('Location: ' . BASE_URL . '/auth/login'); // Hoặc /admin/auth/login nếu có
+                 header('Location: ' . BASE_URL . '/auth/login'); 
                  exit();
             }
         }
-        // Thêm thông tin người dùng hiện tại vào $data nếu chưa có
+        
+        $currentUserFromDB = $this->userModel->findUserById($_SESSION['user_id'] ?? 0);
+
         if (!isset($data['currentUser'])) {
             $data['currentUser'] = [
                 'UserID' => $_SESSION['user_id'] ?? null,
-                'FullName' => $_SESSION['user_fullname'] ?? 'Admin',
+                'FullName' => $currentUserFromDB['FullName'] ?? ($_SESSION['user_fullname'] ?? 'Admin'),
                 'Role' => $_SESSION['user_role'] ?? null,
-                'Avatar' => $_SESSION['user_avatar'] ?? null
+                'Avatar' => $currentUserFromDB['Avatar'] ?? ($_SESSION['user_avatar'] ?? null)
             ];
+        } else { 
+            $data['currentUser']['FullName'] = $data['currentUser']['FullName'] ?? $currentUserFromDB['FullName'] ?? ($_SESSION['user_fullname'] ?? 'Admin');
+            $data['currentUser']['Avatar'] = $data['currentUser']['Avatar'] ?? $currentUserFromDB['Avatar'] ?? ($_SESSION['user_avatar'] ?? null);
         }
-        // Đảm bảo $data['title'] luôn tồn tại
+
         if (!isset($data['title'])) {
-            $data['title'] = 'Admin Panel'; // Title mặc định
+            $data['title'] = 'Admin Panel'; 
         }
 
         if (file_exists(__DIR__ . '/../views/' . $view . '.php')) {
             require_once __DIR__ . '/../views/' . $view . '.php';
         } else {
-            die("View '{$view}' does not exist, my dear admin.");
+            error_log("AdminController: View '{$view}' does not exist.");
+            die("View '{$view}' does not exist, my dear admin. Please check the path.");
         }
     }
-
-    // Hàm authAdmin được giữ lại để kiểm tra quyền admin trong các action cụ thể nếu cần
+    
     public function dashboard() {
-        // ... (code dashboard giữ nguyên như cậu đã cung cấp) ...
         $adminUserId = $_SESSION['user_id'];
         $userStats = [
             'patients' => $this->userModel->getUserCountByRole('Patient'),
@@ -115,14 +125,12 @@ class AdminController {
     }
 
     public function manageSpecializations() {
-        // ... (code giữ nguyên) ...
         $specializations = $this->specializationModel->getAll();
         $data = ['title' => 'Manage Specializations', 'specializations' => $specializations];
         $this->view('admin/manage_specializations', $data);
     }
 
     public function editSpecialization($id = null) {
-        // ... (code giữ nguyên) ...
         $data = ['title' => $id ? 'Edit Specialization' : 'Add New Specialization', 'specialization' => null, 'errors' => [], 'input_name' => '', 'input_description' => ''];
         if ($id) {
             $data['specialization'] = $this->specializationModel->findById((int)$id);
@@ -154,7 +162,6 @@ class AdminController {
     }
 
     public function deleteSpecialization() {
-        // ... (code giữ nguyên) ...
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { $_SESSION['admin_message_error'] = 'Invalid request method.'; header('Location: ' . BASE_URL . '/admin/manageSpecializations'); exit(); }
         if (!isset($_POST['csrf_token']) || !validateCsrfToken($_POST['csrf_token'])) { $_SESSION['admin_message_error'] = 'Invalid CSRF token.'; header('Location: ' . BASE_URL . '/admin/manageSpecializations'); exit(); }
         $id_to_delete = $_POST['id_to_delete'] ?? null;
@@ -184,6 +191,7 @@ class AdminController {
                 'SpecializationID' => $_POST['SpecializationID'] ?? null, 'Bio' => trim($_POST['Bio'] ?? null),
                 'ExperienceYears' => filter_var($_POST['ExperienceYears'] ?? 0, FILTER_VALIDATE_INT, ['options' => ['default' => 0, 'min_range' => 0]]),
                 'ConsultationFee' => filter_var($_POST['ConsultationFee'] ?? 0.00, FILTER_VALIDATE_FLOAT, ['options' => ['default' => 0.00, 'decimal' => '.']]),
+                'Address' => trim($_POST['Address'] ?? null)
             ];
 
             if (empty($data['input']['FullName'])) $data['errors'][] = 'Full Name required.';
@@ -201,7 +209,7 @@ class AdminController {
                 $passwordHash = password_hash($generatedPassword, PASSWORD_DEFAULT);
                 $this->db->beginTransaction();
                 try {
-                    $userData = ['Username' => $data['input']['Username'], 'PasswordHash' => $passwordHash, 'Email' => $data['input']['Email'], 'FullName' => $data['input']['FullName'], 'Role' => $data['input']['Role'], 'PhoneNumber' => $data['input']['PhoneNumber'], 'Address' => $data['input']['Address'] ?? null, 'Status' => $data['input']['Status']];
+                    $userData = ['Username' => $data['input']['Username'], 'PasswordHash' => $passwordHash, 'Email' => $data['input']['Email'], 'FullName' => $data['input']['FullName'], 'Role' => $data['input']['Role'], 'PhoneNumber' => $data['input']['PhoneNumber'], 'Address' => $data['input']['Address'], 'Status' => $data['input']['Status']];
                     $newUserId = $this->userModel->createUser($userData);
                     if (!$newUserId) throw new Exception('Failed to create base user.');
 
@@ -209,9 +217,9 @@ class AdminController {
                         $doctorData = ['SpecializationID' => $data['input']['SpecializationID'], 'Bio' => $data['input']['Bio'], 'ExperienceYears' => $data['input']['ExperienceYears'], 'ConsultationFee' => $data['input']['ConsultationFee']];
                         if (!$this->doctorModel->createDoctorProfile($newUserId, $doctorData)) throw new Exception('Failed to create Doctor profile.');
                     } elseif ($data['input']['Role'] === 'Nurse') {
-                        // Create Nurse profile logic here
+                        if (!$this->nurseModel->createNurseProfile($newUserId)) throw new Exception('Failed to create Nurse profile.'); 
                     } elseif ($data['input']['Role'] === 'Patient') {
-                        $patientData = ['UserID' => $newUserId];
+                        $patientData = ['UserID' => $newUserId]; 
                         if (!$this->patientModel->createPatient($patientData)) throw new Exception('Failed to create Patient profile.');
                     }
 
@@ -291,7 +299,6 @@ class AdminController {
         exit;
     }
     public function editUser($userId = 0) {
-        $this->authAdmin();
         $userId = (int)$userId;
         if ($userId <= 0) {
             $_SESSION['user_management_message_error'] = 'Invalid User ID specified for editing.';
@@ -445,7 +452,6 @@ class AdminController {
         exit();
     }
     public function listMedicines() {
-        $this->authAdmin();
         $searchTerm = trim($_GET['search'] ?? '');
         $medicines = $this->medicineModel->getAllAdmin($searchTerm);
         $data = [
@@ -457,7 +463,6 @@ class AdminController {
     }
 
     public function createMedicine() {
-        $this->authAdmin();
         $data = ['title' => 'Add New Medicine', 'input' => [], 'errors' => []];
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if (!isset($_POST['csrf_token']) || !validateCsrfToken($_POST['csrf_token'])) {
@@ -490,7 +495,6 @@ class AdminController {
     }
 
     public function editMedicine($medicineId = 0) {
-        $this->authAdmin();
         $medicineId = (int)$medicineId;
         if ($medicineId <= 0) { header('Location: ' . BASE_URL . '/admin/listMedicines'); exit; }
         $medicine = $this->medicineModel->findById($medicineId);
@@ -531,7 +535,6 @@ class AdminController {
     }
 
     public function deleteMedicine() {
-        $this->authAdmin();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header('Location: ' . BASE_URL . '/admin/listMedicines'); exit; }
         $medicineId = $_POST['medicine_id_to_delete'] ?? null;
         if (!filter_var($medicineId, FILTER_VALIDATE_INT) || $medicineId <= 0) {
@@ -631,7 +634,6 @@ class AdminController {
 
 
     public function updateProfile() {
-        $this->authAdmin();
         $userId = $_SESSION['user_id'];
         $currentUser = $this->userModel->findUserById($userId);
 
@@ -642,34 +644,28 @@ class AdminController {
             exit();
         }
 
-        // Khởi tạo $data với thông tin user hiện tại
-        // và giá trị input ban đầu cũng là thông tin user hiện tại
         $data = [
             'title' => 'Update My Admin Profile',
-            'user' => $currentUser, // Dùng để hiển thị avatar hiện tại, etc.
-            'input' => (array) $currentUser, // Dữ liệu cho form, sẽ được ghi đè bởi POST nếu có
+            'user' => $currentUser,
+            'input' => (array) $currentUser,
             'errors' => []
         ];
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-            // Ghi đè $data['input'] bằng dữ liệu từ POST
-            // Sử dụng ?? để giữ lại giá trị từ $currentUser nếu POST không có (an toàn hơn)
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_SPECIAL_CHARS);
             $data['input'] = [
                 'FullName' => trim($_POST['FullName'] ?? $currentUser['FullName']),
                 'Email' => trim($_POST['Email'] ?? $currentUser['Email']),
-                'Username' => trim($_POST['Username'] ?? $currentUser['Username']), // Giữ nguyên username từ $currentUser
+                'Username' => trim($currentUser['Username']), 
                 'PhoneNumber' => trim($_POST['PhoneNumber'] ?? $currentUser['PhoneNumber']),
                 'Address' => trim($_POST['Address'] ?? $currentUser['Address']),
                 'current_password' => $_POST['current_password'] ?? '',
                 'new_password' => $_POST['new_password'] ?? '',
                 'confirm_new_password' => $_POST['confirm_new_password'] ?? ''
             ];
-            // Giữ lại Avatar trong input nếu không có upload mới, để logic sau không bị lỗi
             $data['input']['Avatar'] = $currentUser['Avatar'];
 
 
-            // --- VALIDATION ---
             if (empty($data['input']['FullName'])) $data['errors']['FullName'] = 'Full name is required.';
             
             if (empty($data['input']['Email'])) {
@@ -677,11 +673,9 @@ class AdminController {
             } elseif (!filter_var($data['input']['Email'], FILTER_VALIDATE_EMAIL)) {
                 $data['errors']['Email'] = 'Invalid email format.';
             } elseif (strtolower($data['input']['Email']) !== strtolower($currentUser['Email']) && $this->userModel->findUserByEmail($data['input']['Email'], $userId)) {
-                // Chỉ kiểm tra trùng nếu email thay đổi và khác với user hiện tại
                 $data['errors']['Email'] = 'This email is already registered by another user.';
             }
 
-            // Validate mật khẩu nếu người dùng muốn thay đổi
             $updatePassword = false;
             if (!empty($data['input']['new_password'])) {
                 if (empty($data['input']['current_password'])) {
@@ -695,33 +689,29 @@ class AdminController {
                 if ($data['input']['new_password'] !== $data['input']['confirm_new_password']) {
                     $data['errors']['confirm_new_password'] = 'New passwords do not match.';
                 }
-                // Chỉ đặt cờ updatePassword nếu không có lỗi nào liên quan đến password
                 if (empty($data['errors']['current_password']) && empty($data['errors']['new_password']) && empty($data['errors']['confirm_new_password'])) {
                     $updatePassword = true;
                 }
             }
 
-            // Xử lý upload avatar
-            $avatarPathForDB = $currentUser['Avatar']; // Giữ avatar cũ mặc định
-            $avatarFileUploaded = false; // Cờ kiểm tra file có được upload không (chưa chắc thành công)
+            $avatarPathForDB = $currentUser['Avatar']; 
+            $avatarFileUploaded = false; 
 
             if (isset($_FILES['profile_avatar']) && $_FILES['profile_avatar']['error'] == UPLOAD_ERR_OK) {
-                $avatarFileUploaded = true; // Có file được chọn để upload
+                $avatarFileUploaded = true; 
                 $file = $_FILES['profile_avatar'];
                 $fileName = $file['name'];
                 $fileTmpName = $file['tmp_name'];
                 $fileSize = $file['size'];
-                $fileType = $file['type'];
-
+                
                 $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
                 $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
 
                 if (in_array($fileExt, $allowedExtensions)) {
-                    if ($fileSize < 5000000) { // 5MB
+                    if ($fileSize < 5000000) { 
                         $newFileName = "avatar_admin_" . $userId . "_" . uniqid('', true) . "." . $fileExt;
-                        $uploadDirRelative = 'uploads/avatars/'; // Đường dẫn tương đối từ public
+                        $uploadDirRelative = 'uploads/avatars/'; 
                         $uploadDirAbsolute = rtrim(PUBLIC_PATH, '/') . '/' . $uploadDirRelative;
-
 
                         if (!file_exists($uploadDirAbsolute)) {
                             if (!mkdir($uploadDirAbsolute, 0775, true) && !is_dir($uploadDirAbsolute)) {
@@ -729,17 +719,16 @@ class AdminController {
                             }
                         }
 
-                        if (empty($data['errors']['profile_avatar']) && is_writable($uploadDirAbsolute)) { // Kiểm tra quyền ghi
+                        if (empty($data['errors']['profile_avatar']) && is_writable($uploadDirAbsolute)) { 
                             $fileDestinationOnServer = $uploadDirAbsolute . $newFileName;
                             if (move_uploaded_file($fileTmpName, $fileDestinationOnServer)) {
-                                // Xóa avatar cũ nếu có và không phải là default
                                 if (!empty($currentUser['Avatar']) && 
-                                    $currentUser['Avatar'] !== 'assets/images/default_avatar.png' && // Giả sử đây là default
-                                    file_exists(PUBLIC_PATH . $currentUser['Avatar'])) {
-                                    @unlink(PUBLIC_PATH . $currentUser['Avatar']);
+                                    $currentUser['Avatar'] !== 'assets/images/default_avatar.png' && 
+                                    file_exists(rtrim(PUBLIC_PATH, '/') . '/' . ltrim($currentUser['Avatar'], '/'))) {
+                                    @unlink(rtrim(PUBLIC_PATH, '/') . '/' . ltrim($currentUser['Avatar'], '/'));
                                 }
-                                $avatarPathForDB = $uploadDirRelative . $newFileName; // Lưu đường dẫn tương đối vào DB
-                                $data['input']['Avatar'] = $avatarPathForDB; // Cập nhật input để hiển thị preview đúng nếu có lỗi sau đó
+                                $avatarPathForDB = rtrim($uploadDirRelative, '/') . '/' . $newFileName; 
+                                $data['input']['Avatar'] = $avatarPathForDB; 
                             } else {
                                 $data['errors']['profile_avatar'] = "Failed to move uploaded file. Check server permissions for " . htmlspecialchars($uploadDirAbsolute);
                                 error_log("move_uploaded_file failed for admin {$userId}. Temp: {$fileTmpName}, Dest: {$fileDestinationOnServer}");
@@ -754,11 +743,9 @@ class AdminController {
                     $data['errors']['profile_avatar'] = "Invalid file type (allowed: jpg, jpeg, png, gif).";
                 }
             } elseif (isset($_FILES['profile_avatar']) && $_FILES['profile_avatar']['error'] != UPLOAD_ERR_NO_FILE) {
-                // Có lỗi xảy ra trong quá trình upload, không phải là không chọn file
                 $data['errors']['profile_avatar'] = "An error occurred during file upload. Error code: " . $_FILES['profile_avatar']['error'];
             }
 
-            // (CSRF Token Validation)
             if (!isset($_POST['csrf_token']) || !validateCsrfToken($_POST['csrf_token'])) {
                 $data['errors']['csrf'] = 'Invalid CSRF token. Action aborted.';
             }
@@ -768,7 +755,7 @@ class AdminController {
                 try {
                     $phoneNumberToSave = trim($data['input']['PhoneNumber']);
                     if ($phoneNumberToSave === '') {
-                        $phoneNumberToSave = null; // Chuyển chuỗi rỗng thành NULL cho PhoneNumber
+                        $phoneNumberToSave = null; 
                     }
 
                     $userDataToUpdate = [
@@ -776,18 +763,15 @@ class AdminController {
                         'Email' => $data['input']['Email'],
                         'PhoneNumber' => $phoneNumberToSave,
                         'Address' => $data['input']['Address'],
-                        // Avatar sẽ được cập nhật nếu $avatarPathForDB khác với $currentUser['Avatar']
-                        // Hoặc nếu $avatarFileUploaded là true và không có lỗi avatar
                     ];
                     
-                    // Chỉ thêm 'Avatar' vào mảng update nếu nó thực sự thay đổi
                     if ($avatarPathForDB !== $currentUser['Avatar']) {
                         $userDataToUpdate['Avatar'] = $avatarPathForDB;
                     }
 
                     $userUpdateSuccess = $this->userModel->updateUser($userId, $userDataToUpdate);
                     
-                    $passwordUpdateSuccess = true; // Mặc định là true nếu không đổi pass
+                    $passwordUpdateSuccess = true; 
                     if ($updatePassword) {
                         $newPasswordHash = password_hash($data['input']['new_password'], PASSWORD_DEFAULT);
                         $passwordUpdateSuccess = $this->userModel->updatePassword($userId, $newPasswordHash);
@@ -797,48 +781,41 @@ class AdminController {
                         $this->db->commit();
                         $_SESSION['profile_message_success'] = 'Admin profile updated successfully.';
                         
-                        // Cập nhật session với thông tin mới
                         $_SESSION['user_fullname'] = $data['input']['FullName'];
                         $_SESSION['user_email'] = $data['input']['Email'];
                         if ($avatarPathForDB !== $currentUser['Avatar']) {
-                             $_SESSION['user_avatar'] = $avatarPathForDB; // Lưu đường dẫn tương đối
+                             $_SESSION['user_avatar'] = $avatarPathForDB; 
                         }
                         
-                        header('Location: ' . BASE_URL . '/admin/updateProfile');
-                        exit();
+
+                        $this->updateProfile(); 
+                        return;
                     } else {
                         $this->db->rollBack();
-                        // Nếu upload file thành công nhưng DB fail, và avatar đã thay đổi
-                        if ($avatarFileUploaded && $avatarPathForDB !== $currentUser['Avatar'] && file_exists(PUBLIC_PATH . $avatarPathForDB)) {
-                            @unlink(PUBLIC_PATH . $avatarPathForDB); // Xóa file mới upload
+                        if ($avatarFileUploaded && $avatarPathForDB !== $currentUser['Avatar'] && file_exists(rtrim(PUBLIC_PATH, '/') . '/' . ltrim($avatarPathForDB, '/'))) {
+                            @unlink(rtrim(PUBLIC_PATH, '/') . '/' . ltrim($avatarPathForDB, '/')); 
                         }
                         $data['errors']['database'] = 'Failed to update profile in database. Please try again.';
                     }
                 } catch (Exception $e) {
                     if ($this->db->inTransaction()) $this->db->rollBack();
-                    // Nếu upload file thành công nhưng có exception, và avatar đã thay đổi
-                    if ($avatarFileUploaded && $avatarPathForDB !== $currentUser['Avatar'] && file_exists(PUBLIC_PATH . $avatarPathForDB)) {
-                        @unlink(PUBLIC_PATH . $avatarPathForDB); // Xóa file mới upload
+                    if ($avatarFileUploaded && $avatarPathForDB !== $currentUser['Avatar'] && file_exists(rtrim(PUBLIC_PATH, '/') . '/' . ltrim($avatarPathForDB, '/'))) {
+                        @unlink(rtrim(PUBLIC_PATH, '/') . '/' . ltrim($avatarPathForDB, '/')); 
                     }
                     error_log("Error updating admin profile {$userId}: " . $e->getMessage());
-                    // Kiểm tra lỗi cụ thể từ $e->getMessage() để đưa ra thông báo thân thiện hơn nếu cần
                     if (strpos($e->getMessage(), 'Duplicate entry') !== false && strpos($e->getMessage(), 'PhoneNumber') !== false) {
                         $data['errors']['PhoneNumber'] = 'This phone number is already in use or there was an issue saving it. Please try a different one or leave it blank.';
                     } else {
-                        $data['errors']['exception'] = 'An unexpected error occurred: ' . $e->getMessage();
+                        $data['errors']['exception'] = 'An unexpected error occurred. Please try again later.';
                     }
                 }
             }
-
         }
-
-
-
         $this->view('admin/profile/update', $data);
     }
 
+
     public function toggleFeedbackPublication() {
-        $this->authAdmin();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $_SESSION['admin_feedback_message_error'] = 'Invalid request method.';
             header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/admin/manageFeedbacks')); exit();
@@ -864,7 +841,6 @@ class AdminController {
         exit();
     }
     public function databaseManagement() {
-        $this->authAdmin();
         $backupFiles = [];
         if (is_dir($this->backupPath)) {
             $files = glob($this->backupPath . '*.sql');
@@ -876,7 +852,6 @@ class AdminController {
                         'date' => filemtime($file)
                     ];
                 }
-                // Sắp xếp file mới nhất lên đầu
                 usort($backupFiles, function($a, $b) {
                     return $b['date'] <=> $a['date'];
                 });
@@ -892,7 +867,6 @@ class AdminController {
     }
 
     public function createBackup() {
-        $this->authAdmin();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             header('Location: ' . BASE_URL . '/admin/databaseManagement'); exit();
         }
@@ -916,31 +890,25 @@ class AdminController {
         $dbConfig = require __DIR__ . '/../../config/database.php';
         $dbName = $dbConfig['name'];
         $dbUser = $dbConfig['user'];
-        $dbPass = $dbConfig['password']; // Lấy mật khẩu từ config
+        $dbPass = $dbConfig['password']; 
         $dbHost = $dbConfig['host'];
 
-        // CẬU NHỚ SỬA ĐƯỜNG DẪN NÀY CHO ĐÚNG VỚI MÁY XAMPP CỦA CẬU NHA!
-        $mysqldumpExecutable = 'C:/xampp/mysql/bin/mysqldump.exe'; // Quan trọng: Dùng / hoặc \\
+        $mysqldumpExecutable = 'C:/xampp/mysql/bin/mysqldump.exe'; 
 
         $fileName = $dbName . '_backup_' . date('Y-m-d_H-i-s') . '.sql';
         $filePath = $this->backupPath . $fileName;
         
         $passwordArg = !empty($dbPass) ? '--password=' . escapeshellarg($dbPass) : '';
-        // Nếu user là root và không có pass (mặc định XAMPP) thì $passwordArg sẽ rỗng, mysqldump sẽ không hỏi pass.
-        // Nếu có pass, nó sẽ được thêm vào.
-
+        
         $command = sprintf('%s --host=%s --user=%s %s --result-file=%s %s',
             escapeshellarg($mysqldumpExecutable),
             escapeshellarg($dbHost),
             escapeshellarg($dbUser),
-            $passwordArg, // Thêm đối số mật khẩu ở đây
-            escapeshellarg($filePath), // Dùng --result-file thay vì > để an toàn hơn
+            $passwordArg, 
+            escapeshellarg($filePath), 
             escapeshellarg($dbName)
         );
         
-        // Để debug, cậu có thể bỏ comment dòng này để xem lệnh được tạo ra:
-        // echo "<pre>Command: " . htmlspecialchars($command) . "</pre>"; die();
-
         @exec($command, $output, $return_var);
 
         if ($return_var === 0 && file_exists($filePath) && filesize($filePath) > 0) {
@@ -948,7 +916,7 @@ class AdminController {
         } else {
             $_SESSION['db_message_error'] = 'Failed to create database backup. Please check server configuration, paths, and permissions.';
             error_log("mysqldump failed. Return var: $return_var. Command: $command. Output: " . implode("\n", $output));
-            if (file_exists($filePath) && filesize($filePath) === 0) { // Xóa file rỗng nếu tạo ra
+            if (file_exists($filePath) && filesize($filePath) === 0) { 
                 unlink($filePath);
             }
         }
@@ -957,7 +925,6 @@ class AdminController {
     }
 
     public function restoreBackup() {
-        $this->authAdmin();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             header('Location: ' . BASE_URL . '/admin/databaseManagement'); exit();
         }
@@ -977,11 +944,10 @@ class AdminController {
         $dbConfig = require __DIR__ . '/../../config/database.php';
         $dbName = $dbConfig['name'];
         $dbUser = $dbConfig['user'];
-        $dbPass = $dbConfig['password']; // Lấy mật khẩu từ config
+        $dbPass = $dbConfig['password']; 
         $dbHost = $dbConfig['host'];
 
-        // CẬU NHỚ SỬA ĐƯỜNG DẪN NÀY CHO ĐÚNG VỚI MÁY XAMPP CỦA CẬU NHA!
-        $mysqlExecutable = 'C:/xampp/mysql/bin/mysql.exe'; // Quan trọng: Dùng / hoặc \\
+        $mysqlExecutable = 'C:/xampp/mysql/bin/mysql.exe'; 
 
         $passwordArg = !empty($dbPass) ? '--password=' . escapeshellarg($dbPass) : '';
 
@@ -989,14 +955,11 @@ class AdminController {
             escapeshellarg($mysqlExecutable),
             escapeshellarg($dbHost),
             escapeshellarg($dbUser),
-            $passwordArg, // Thêm đối số mật khẩu
+            $passwordArg, 
             escapeshellarg($dbName),
             escapeshellarg($filePath)
         );
         
-        // Để debug:
-        // echo "<pre>Command: " . htmlspecialchars($command) . "</pre>"; die();
-
         @exec($command, $output, $return_var);
 
         if ($return_var === 0) {
@@ -1009,18 +972,15 @@ class AdminController {
         exit();
     }
     public function manageLeaveRequests() {
-        $this->authAdmin(); // Đảm bảo chỉ Admin truy cập
-
-        // Lấy các filter từ GET request
         $filters = [
-            'status' => $_GET['status'] ?? 'All', // Mặc định xem tất cả hoặc 'Pending'
+            'status' => $_GET['status'] ?? 'All', 
             'doctor_id' => filter_input(INPUT_GET, 'doctor_id', FILTER_VALIDATE_INT),
             'date_from' => trim($_GET['date_from'] ?? ''),
             'date_to' => trim($_GET['date_to'] ?? '')
         ];
 
         $leaveRequests = $this->leaveRequestModel->getAllLeaveRequests($filters);
-        $doctors = $this->doctorModel->getAllDoctorsSimple(); // Lấy danh sách bác sĩ để lọc
+        $doctors = $this->doctorModel->getAllDoctorsSimple(); 
 
         $data = [
             'title' => 'Manage Leave Requests',
@@ -1033,7 +993,6 @@ class AdminController {
     }
 
     public function reviewLeaveRequest($leaveRequestId = 0) {
-        $this->authAdmin();
         $leaveRequestId = (int)$leaveRequestId;
         if ($leaveRequestId <= 0) {
             $_SESSION['admin_message_error'] = 'Invalid leave request ID.';
@@ -1048,7 +1007,6 @@ class AdminController {
             exit();
         }
 
-        // Kiểm tra xem có lịch làm việc hoặc lịch hẹn nào trùng không
         $overlappingAvailability = $this->leaveRequestModel->getOverlappingAvailability($leaveRequest['DoctorID'], $leaveRequest['StartDate'], $leaveRequest['EndDate']);
         $overlappingAppointments = $this->leaveRequestModel->getOverlappingAppointments($leaveRequest['DoctorID'], $leaveRequest['StartDate'], $leaveRequest['EndDate']);
 
@@ -1066,14 +1024,12 @@ class AdminController {
     }
 
     public function processLeaveReview($leaveRequestId = 0) {
-        $this->authAdmin();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             header('Location: ' . BASE_URL . '/admin/manageLeaveRequests');
             exit();
         }
         if (!isset($_POST['csrf_token']) || !validateCsrfToken($_POST['csrf_token'])) {
             $_SESSION['admin_message_error'] = 'Invalid security token.';
-            // Redirect về trang review với ID để người dùng không mất context
             header('Location: ' . BASE_URL . '/admin/reviewLeaveRequest/' . $leaveRequestId);
             exit();
         }
@@ -1091,7 +1047,6 @@ class AdminController {
             header('Location: ' . BASE_URL . '/admin/manageLeaveRequests');
             exit();
         }
-        // Không cho duyệt lại nếu đã Approved hoặc Rejected
         if (in_array($leaveRequest['Status'], ['Approved', 'Rejected'])) {
              $_SESSION['admin_message_error'] = 'This leave request has already been processed.';
              header('Location: ' . BASE_URL . '/admin/reviewLeaveRequest/' . $leaveRequestId);
@@ -1121,36 +1076,20 @@ class AdminController {
             exit();
         }
 
-        // Bắt đầu transaction nếu có nhiều thao tác DB (ví dụ: cập nhật slot, hủy hẹn)
         $this->db->beginTransaction();
         try {
             if ($this->leaveRequestModel->updateLeaveRequestStatus($leaveRequestId, $newStatus, $adminNotes, $adminUserId)) {
                 
-                // Xử lý nâng cao nếu 'Approved'
                 if ($newStatus === 'Approved') {
-                    // 1. Vô hiệu hóa các slot làm việc của bác sĩ trong khoảng thời gian nghỉ
-                    // $this->doctorAvailabilityModel->deactivateSlotsForLeave($leaveRequest['DoctorID'], $leaveRequest['StartDate'], $leaveRequest['EndDate']);
-                    // Cần tạo hàm deactivateSlotsForLeave trong DoctorAvailabilityModel
-                    // Hàm này có thể xóa slot hoặc thêm cờ IsOnLeave = true
-
-                    // 2. Xử lý các lịch hẹn đã đặt trùng với thời gian nghỉ
                     $conflictingAppointments = $this->leaveRequestModel->getOverlappingAppointments($leaveRequest['DoctorID'], $leaveRequest['StartDate'], $leaveRequest['EndDate'], ['Scheduled', 'Confirmed']);
                     foreach ($conflictingAppointments as $appt) {
-                        // Hủy lịch hẹn và thông báo (ví dụ)
                         $this->appointmentModel->updateAppointmentStatus($appt['AppointmentID'], 'CancelledByClinic');
-                        // Gửi thông báo cho bệnh nhân và bác sĩ về việc hủy lịch do nghỉ phép
-                        // $this->notificationModel->createNotificationForPatientAboutCancellation($appt['PatientID'], ...);
-                        // $this->notificationModel->createNotificationForDoctorAboutCancellation($appt['DoctorID'], ...);
                         error_log("Admin approved leave: Appointment #{$appt['AppointmentID']} for Doctor #{$leaveRequest['DoctorID']} was auto-cancelled due to approved leave.");
                     }
                 }
                 
                 $this->db->commit();
                 $_SESSION['admin_message_success'] = "Leave request #{$leaveRequestId} has been {$newStatus}.";
-                // Gửi thông báo cho bác sĩ về kết quả
-                // $doctorUser = $this->userModel->findUserById($leaveRequest['DoctorUserID']); // Cần DoctorUserID
-                // if($doctorUser) $this->mailService->sendLeaveRequestStatusUpdateEmail($doctorUser['Email'], ...);
-                // $this->notificationModel->createNotificationForDoctorAboutLeaveStatus($leaveRequest['DoctorUserID'], ...);
 
             } else {
                 $this->db->rollBack();
@@ -1164,6 +1103,72 @@ class AdminController {
 
         header('Location: ' . BASE_URL . '/admin/manageLeaveRequests');
         exit();
+    }
+
+    public function manageDoctorNurseAssignments() {
+        $doctors = $this->doctorModel->getAllDoctorsWithDetails(); 
+        $allNurses = $this->nurseModel->getAllNursesWithUserDetails(); 
+        
+        $assignmentsData = [];
+        if (is_array($doctors)) { // Check if $doctors is an array before looping
+            foreach ($doctors as $doctor) {
+                $assignedNurses = $this->doctorNurseAssignmentModel->getAssignedNursesByDoctorId($doctor['DoctorID']);
+                $unassignedNursesForThisDoctor = $this->doctorNurseAssignmentModel->getUnassignedNursesForDoctor($doctor['DoctorID'], $allNurses);
+                
+                $assignmentsData[] = [
+                    'doctor_id' => $doctor['DoctorID'],
+                    'doctor_name' => $doctor['FullName'], 
+                    'doctor_specialization' => $doctor['SpecializationName'] ?? 'N/A', 
+                    'assigned_nurses' => $assignedNurses,
+                    'available_nurses_for_assignment' => $unassignedNursesForThisDoctor
+                ];
+            }
+        }
+
+
+        $data = [
+            'title' => 'Manage Doctor-Nurse Assignments',
+            'assignments_data' => $assignmentsData,
+        ];
+        $this->view('admin/assignments/manage', $data); 
+    }
+
+    public function processAssignment() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $_SESSION['assignment_message_error'] = 'Invalid request method.';
+            $this->manageDoctorNurseAssignments(); 
+            return;
+        }
+        if (!isset($_POST['csrf_token']) || !validateCsrfToken($_POST['csrf_token'])) {
+            $_SESSION['assignment_message_error'] = 'Invalid CSRF token.';
+            $this->manageDoctorNurseAssignments();
+            return;
+        }
+
+        $doctorId = filter_input(INPUT_POST, 'doctor_id', FILTER_VALIDATE_INT);
+        $nurseId = filter_input(INPUT_POST, 'nurse_id', FILTER_VALIDATE_INT);
+        $actionType = trim($_POST['action_type'] ?? ''); 
+
+        if (!$doctorId || !$nurseId || !in_array($actionType, ['assign', 'unassign'])) {
+            $_SESSION['assignment_message_error'] = 'Invalid data provided for assignment processing.';
+            $this->manageDoctorNurseAssignments();
+            return;
+        }
+
+        $result = null;
+        if ($actionType === 'assign') {
+            $result = $this->doctorNurseAssignmentModel->assignNurseToDoctor($doctorId, $nurseId);
+        } elseif ($actionType === 'unassign') {
+            $result = $this->doctorNurseAssignmentModel->unassignNurseFromDoctor($doctorId, $nurseId);
+        }
+
+        if ($result && isset($result['success']) && $result['success']) { 
+            $_SESSION['assignment_message_success'] = $result['message'];
+        } else {
+            $_SESSION['assignment_message_error'] = $result['message'] ?? 'An unknown error occurred during assignment processing.';
+        }
+        
+        $this->manageDoctorNurseAssignments();
     }
 }
 ?>
