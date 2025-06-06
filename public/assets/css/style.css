@@ -1,0 +1,343 @@
+/* public/assets/css/landing-style.css */
+body {
+    font-family: 'Poppins', sans-serif;
+    margin: 0;
+    padding: 0;
+    line-height: 1.7;
+    color: #555;
+    background-color: #fff;
+}
+
+.container {
+    width: 90%;
+    max-width: 1200px; /* Giới hạn chiều rộng tối đa */
+    margin: auto;
+    padding: 0 15px;
+}
+
+/* --- Header --- */
+#main-header {
+    background-color: #fff;
+    padding: 15px 0;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    position: sticky; /* Để header dính lại khi cuộn */
+    top: 0;
+    z-index: 1000;
+    width: 100%;
+}
+
+.header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    color: #333;
+    font-size: 1.8rem; /* Kích thước logo */
+    font-weight: 700;
+}
+.logo .logo-icon {
+    color: #007bff; /* Màu icon logo */
+    margin-right: 8px;
+    font-size: 1.5rem;
+}
+.logo span {
+    color: #0d47a1; /* Màu chữ Axiscare */
+}
+
+
+#main-nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+}
+
+#main-nav ul li {
+    margin-left: 30px; /* Khoảng cách giữa các item menu */
+}
+
+#main-nav ul li a {
+    text-decoration: none;
+    color: #555; /* Màu chữ menu */
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+#main-nav ul li a:hover,
+#main-nav ul li a.active { /* Thêm class active cho trang hiện tại nếu cần */
+    color: #007bff; /* Màu khi hover */
+}
+
+.btn { /* Style chung cho nút */
+    padding: 10px 25px;
+    text-decoration: none;
+    border-radius: 25px; /* Bo tròn mạnh hơn */
+    font-weight: 600;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    display: inline-block;
+    text-align: center;
+}
+
+.btn-primary {
+    background-color: #007bff; /* Màu nút chính của mẫu (Make Appointment) */
+    color: white;
+    border: 1px solid #007bff;
+}
+.btn-primary:hover {
+    background-color: #0056b3;
+    border-color: #0056b3;
+}
+
+.btn-secondary { /* Nút phụ như Book An Appointment trong hero */
+    background-color: #17a2b8; /* Màu xanh lá/teal của nút mẫu */
+    color: white;
+    border: 1px solid #17a2b8;
+}
+.btn-secondary:hover {
+    background-color: #138496;
+    border-color: #138496;
+}
+
+
+/* Mobile Menu Toggle */
+#mobile-menu-toggle {
+    display: none; /* Ẩn trên desktop */
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #333;
+    cursor: pointer;
+}
+
+
+/* --- Hero Section --- */
+#hero-section {
+    background: linear-gradient(to right, #e0f2f7, #b3e0f2); /* Gradient xanh nhạt, điều chỉnh cho giống mẫu */
+    /* Hoặc sử dụng một màu xanh dịu: background-color: #e7f5ff; */
+    padding: 80px 0 0 0; /* Padding trên, không padding dưới vì ảnh có thể tràn */
+    overflow: hidden; /* Để ảnh không làm vỡ layout */
+}
+
+.hero-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative; /* Để các item con có thể position absolute nếu cần */
+}
+
+.hero-content {
+    flex-basis: 55%; /* Chiếm khoảng 55% chiều rộng */
+    padding-right: 30px; /* Khoảng cách với ảnh */
+    animation: slideInFromLeft 1s ease-out;
+}
+
+.hero-welcome-text {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #007bff; /* Màu chữ WELCOME TO MEDCARE */
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.hero-content h1 {
+    font-size: 3.2rem; /* Kích thước tiêu đề lớn */
+    font-weight: 700;
+    color: #1a2a48; /* Màu chữ tiêu đề đậm */
+    line-height: 1.2;
+    margin-bottom: 20px;
+}
+
+.hero-description {
+    font-size: 1.1rem;
+    color: #5f6c7b; /* Màu chữ mô tả */
+    margin-bottom: 30px;
+    max-width: 500px;
+}
+
+.hero-image-container {
+    flex-basis: 45%;
+    text-align: right; /* Hoặc center tùy cách bạn muốn ảnh hiển thị */
+    position: relative; /* Cho phép ảnh có thể hơi tràn ra ngoài nếu muốn */
+    animation: slideInFromRight 1s ease-out;
+}
+
+.hero-image-container img {
+    max-width: 100%;
+    height: auto;
+    /* vertical-align: bottom; Để ảnh chạm đáy section nếu không có padding-bottom */
+    /* Có thể cần điều chỉnh margin hoặc position để giống mẫu */
+    max-height: 550px; /* Giới hạn chiều cao ảnh để không quá lớn */
+    object-fit: contain; /* Hoặc cover, tùy theo ảnh của bạn */
+}
+
+/* --- Info Strip Section --- */
+#info-strip-section {
+    background-color: #fff;
+    padding: 50px 0;
+    margin-top: -60px; /* Để nó hơi đè lên hero section, tạo hiệu ứng như mẫu */
+    position: relative; /* Để có z-index cao hơn hero nếu cần */
+    z-index: 10;
+    border-radius: 15px; /* Bo góc dải trắng */
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    margin-left: auto;
+    margin-right: auto;
+    /* Điều chỉnh width cho dải trắng nếu nó không full width container */
+    width: calc(100% - 60px); /* Ví dụ, nhỏ hơn container một chút */
+    max-width: 1140px; /* Giữ cho nó không quá rộng trên màn hình lớn */
+}
+
+.info-strip-container {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-start; /* Hoặc center tùy ý */
+    gap: 30px; /* Khoảng cách giữa các item */
+}
+
+.info-item {
+    text-align: center;
+    flex-basis: 30%; /* Chia đều cho 3 item */
+    padding: 20px;
+}
+
+.info-icon-container {
+    /* Style cho background của icon nếu cần, như trong mẫu là hình tròn màu */
+    background-color: #e7f5ff; /* Màu nền nhẹ cho icon */
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 15px;
+    color: #007bff; /* Màu icon */
+}
+
+.info-item h3 {
+    font-size: 1.3rem;
+    color: #1a2a48;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.info-item p {
+    font-size: 0.9rem;
+    color: #5f6c7b;
+    line-height: 1.6;
+}
+
+/* Animations */
+@keyframes slideInFromLeft {
+    0% { transform: translateX(-100%); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes slideInFromRight {
+    0% { transform: translateX(100%); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+}
+
+
+/* --- Footer --- */
+footer {
+    background-color: #0d47a1; /* Màu xanh đậm như mẫu */
+    color: #a7c0de; /* Màu chữ nhạt hơn */
+    padding: 40px 0;
+    text-align: center;
+    margin-top: 50px; /* Khoảng cách với section cuối */
+}
+footer p {
+    margin: 5px 0;
+}
+footer a {
+    color: #fff; /* Màu link trong footer */
+    text-decoration: none;
+}
+footer a:hover {
+    text-decoration: underline;
+}
+
+
+/* --- Responsive Design --- */
+@media (max-width: 992px) {
+    .hero-container {
+        flex-direction: column;
+        text-align: center;
+    }
+    .hero-content {
+        padding-right: 0;
+        margin-bottom: 40px;
+        order: 2; /* Nội dung xuống dưới ảnh trên mobile */
+    }
+    .hero-image-container {
+        order: 1;
+        margin-bottom: 30px; /* Khoảng cách với content */
+        text-align: center;
+    }
+    .hero-image-container img {
+        max-height: 400px;
+    }
+    #info-strip-section {
+        margin-top: 30px; /* Giảm margin top khi hero xếp dọc */
+        width: calc(100% - 30px);
+    }
+}
+
+@media (max-width: 768px) {
+    #main-nav {
+        display: none; /* Ẩn menu chính */
+        flex-direction: column;
+        position: absolute;
+        top: 70px; /* Điều chỉnh dựa trên chiều cao header */
+        left: 0;
+        width: 100%;
+        background-color: #fff;
+        box-shadow: 0 5px 10px rgba(0,0,0,0.1);
+    }
+    #main-nav.active { /* Hiện menu khi nút được click */
+        display: flex;
+    }
+    #main-nav ul {
+        flex-direction: column;
+        width: 100%;
+    }
+    #main-nav ul li {
+        margin: 0;
+        text-align: center;
+        border-bottom: 1px solid #eee;
+    }
+    #main-nav ul li a {
+        display: block;
+        padding: 15px;
+    }
+    #mobile-menu-toggle {
+        display: block; /* Hiện nút toggle menu */
+    }
+    .btn-make-appointment {
+        display: none; /* Có thể ẩn nút này trên mobile và đưa vào menu */
+    }
+
+    .hero-content h1 {
+        font-size: 2.5rem;
+    }
+    .hero-description {
+        font-size: 1rem;
+    }
+
+    .info-strip-container {
+        flex-direction: column; /* Xếp dọc các item info */
+        align-items: center;
+    }
+    .info-item {
+        flex-basis: auto; /* Không cần chia cột nữa */
+        width: 80%; /* Hoặc một giá trị phù hợp */
+        margin-bottom: 20px;
+    }
+    #info-strip-section {
+        padding: 30px 0;
+    }
+}
