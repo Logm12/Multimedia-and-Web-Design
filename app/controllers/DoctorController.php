@@ -9,24 +9,28 @@ class DoctorController {
     private $patientModel;
     private $userModel;
     private $notificationModel;
-    private $leaveRequestModel; // <<<< THÊM MODEL MỚI NÈ CẬU
+    private $leaveRequestModel;
+    private $medicalRecordModel; // Assuming this is added for EMR
+    private $prescriptionModel;  // Assuming this is added for EMR
+    private $medicineModel;      // Assuming this is added for EMR
+    private $db;                 // Assuming this is added for transactions
 
     public function __construct() {
         if (session_status() == PHP_SESSION_NONE) {
             session_start();
         }
         
+        if (file_exists(__DIR__ . '/../helpers/csrf_helper.php')) {
+            require_once __DIR__ . '/../helpers/csrf_helper.php';
+        }
+        
         $urlPath = $_GET['url'] ?? '';
-        $urlParts = explode('/', rtrim($urlPath, '/')); // Rtrim để xử lý dấu / cuối URL
+        $urlParts = explode('/', rtrim($urlPath, '/'));
         $controllerNameFromUrl = $urlParts[0] ?? '';
-        // Action mặc định là 'dashboard' nếu không có gì được chỉ định
         $currentAction = $urlParts[1] ?? 'dashboard'; 
 
-        // Xác thực vai trò Doctor cho các action không public
         if (strtolower($controllerNameFromUrl) === 'doctor') {
-            // Các action public (ví dụ: trang profile công khai của bác sĩ nếu có)
-            $publicActions = []; // Hiện tại không có action public nào cho Doctor
-            
+            $publicActions = []; 
             if (!in_array($currentAction, $publicActions)) {
                 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'Doctor') {
                     $_SESSION['error_message'] = "Access denied. Please log in as a Doctor.";
@@ -36,7 +40,6 @@ class DoctorController {
             }
         }
         
-        // Khởi tạo các model
         try {
             $this->doctorModel = new DoctorModel();
             $this->appointmentModel = new AppointmentModel();
@@ -45,7 +48,12 @@ class DoctorController {
             $this->notificationModel = new NotificationModel(); 
             $this->patientModel = new PatientModel();
             $this->userModel = new UserModel();
-            $this->leaveRequestModel = new LeaveRequestModel(); // <<<< KHỞI TẠO MODEL MỚI
+            $this->leaveRequestModel = new LeaveRequestModel();
+            // Assuming these are needed for the EMR saving logic
+            $this->medicalRecordModel = new MedicalRecordModel();
+            $this->prescriptionModel = new PrescriptionModel();
+            $this->medicineModel = new MedicineModel();
+            $this->db = Database::getInstance();
         } catch (Error $e) {
             error_log("FATAL: Model initialization error in DoctorController: " . $e->getMessage());
             die("A critical error occurred during application setup. Please check logs or contact support. Details: " . htmlspecialchars($e->getMessage()));
@@ -58,13 +66,10 @@ class DoctorController {
             header('Location: ' . BASE_URL . '/auth/login');
             exit();
         }
-        // Lấy DoctorID từ bảng doctors dựa trên UserID trong session
         $doctorInfo = $this->doctorModel->getDoctorByUserId($_SESSION['user_id']);
         if (!$doctorInfo || !isset($doctorInfo['DoctorID'])) {
-            // User này có Role Doctor nhưng không có record trong bảng doctors, hoặc getDoctorByUserId lỗi
             $_SESSION['error_message'] = "Doctor profile not found. Please contact administrator.";
             error_log("Doctor profile (DoctorID) missing for UserID: " . $_SESSION['user_id'] . ". Logging out.");
-            // Đăng xuất để tránh lỗi ở các bước sau
             unset($_SESSION['user_id'], $_SESSION['user_role'], $_SESSION['user_fullname'], $_SESSION['user_avatar']);
             header('Location: ' . BASE_URL . '/auth/login?error=doctor_profile_missing'); 
             exit();
@@ -73,7 +78,6 @@ class DoctorController {
     }
 
     protected function view($view, $data = []) {
-        // Thêm thông tin người dùng hiện tại vào $data nếu chưa có
         if (!isset($data['currentUser'])) {
             $data['currentUser'] = [
                 'UserID' => $_SESSION['user_id'] ?? null,
@@ -82,9 +86,8 @@ class DoctorController {
                 'Avatar' => $_SESSION['user_avatar'] ?? null
             ];
         }
-        // Đảm bảo $data['title'] luôn tồn tại
         if (!isset($data['title'])) {
-            $data['title'] = 'Doctor Panel'; // Title mặc định
+            $data['title'] = 'Doctor Panel'; 
         }
 
         if (file_exists(__DIR__ . '/../views/' . $view . '.php')) {
@@ -102,7 +105,6 @@ class DoctorController {
             $response['data'] = $data;
         }
         echo json_encode($response);
-        // Không exit ở đây để cho phép controller gọi nó rồi exit sau nếu cần
     }
     public function dashboard() {
         $doctorId = $this->getLoggedInDoctorId();
@@ -110,7 +112,7 @@ class DoctorController {
         for ($i = 3; $i >= 0; $i--) {
             $weekStartDate = date('Y-m-d', strtotime("monday this week -{$i} weeks"));
             $appointmentOverviewData['labels'][] = "Week " . date('W', strtotime($weekStartDate));
-            $appointmentOverviewData['counts'][] = rand(5, 25); // Placeholder, thay bằng logic thật
+            $appointmentOverviewData['counts'][] = rand(5, 25); 
         }
         $data = [
             'title' => 'Doctor Dashboard',
@@ -132,7 +134,7 @@ class DoctorController {
         if (!in_array($statusFilterInput, $validStatuses)) $statusFilterInput = 'All';
         
         $dateRangeFilter = []; 
-        $currentDateFilterForView = $dateFilterInput; // Giữ lại giá trị gốc để hiển thị
+        $currentDateFilterForView = $dateFilterInput; 
 
         switch ($dateFilterInput) {
             case 'today': $dateRangeFilter['specific_date'] = date('Y-m-d'); break;
@@ -141,12 +143,12 @@ class DoctorController {
                 $dateRangeFilter['end_date'] = date('Y-m-d', strtotime('sunday this week')); 
                 break;
             case 'all_upcoming': $dateRangeFilter['type'] = 'all_upcoming'; break;
-            case 'all_time': /* không cần filter ngày */ break;
+            case 'all_time': break;
             default:
                 if (DateTime::createFromFormat('Y-m-d', $dateFilterInput) !== false) {
                     $dateRangeFilter['specific_date'] = $dateFilterInput;
                 } else { 
-                    $currentDateFilterForView = 'all_upcoming'; // Nếu không hợp lệ, quay về mặc định
+                    $currentDateFilterForView = 'all_upcoming'; 
                     $dateRangeFilter['type'] = 'all_upcoming'; 
                 }
                 break;
@@ -164,15 +166,12 @@ class DoctorController {
 
     public function manageAvailability() {
         $doctorId = $this->getLoggedInDoctorId();
-        // Lấy ngày bắt đầu và kết thúc từ GET params cho FullCalendar, hoặc mặc định
         $viewStartDate = $_GET['start'] ?? date('Y-m-01'); 
         $viewEndDate = $_GET['end'] ?? date('Y-m-t', strtotime($viewStartDate . ' +2 months')); 
         
-        // Lấy slots cho FullCalendar (đã có logic này ở hàm getAvailabilityEvents)
-        // Ở đây chỉ cần truyền tháng hiện tại cho mini calendar nếu có
         $data = [
             'title' => 'Manage Availability', 
-            'slotsForCalendar' => [], // Sẽ được load bằng AJAX qua getAvailabilityEvents
+            'slotsForCalendar' => [], 
             'currentMonthYearForMiniCal' => date('F Y', strtotime($viewStartDate))
         ];
         $this->view('doctor/manage_availability', $data);
@@ -184,9 +183,8 @@ class DoctorController {
         $startParam = $_GET['start'] ?? null; 
         $endParam = $_GET['end'] ?? null;  
         
-        // FullCalendar gửi start và end là thời điểm, cần chuyển về ngày
         $startDate = $startParam ? date('Y-m-d', strtotime($startParam)) : date('Y-m-01');
-        $endDate = $endParam ? date('Y-m-d', strtotime($endParam . ' -1 day')) : date('Y-m-t', strtotime($startDate . ' +2 months')); // FC end là exclusive
+        $endDate = $endParam ? date('Y-m-d', strtotime($endParam . ' -1 day')) : date('Y-m-t', strtotime($startDate . ' +2 months')); 
 
         $rawSlots = $this->doctorAvailabilityModel->getSlotsByDoctorForDateRange($doctorId, $startDate, $endDate);
         $calendarEvents = [];
@@ -275,15 +273,13 @@ class DoctorController {
         
         try {
             if ($this->doctorAvailabilityModel->deleteSlotByIdAndDoctor((int)$availabilityId, $doctorId)) {
-                $db = Database::getInstance(); // Lấy instance DB để kiểm tra rowCount
+                $db = Database::getInstance(); 
                 if ($db->rowCount() > 0) {
                     $this->sendJsonResponse(true, 'Slot deleted successfully.');
                 } else {
-                    // Slot không tồn tại, không thuộc bác sĩ, hoặc đã được đặt và không thể xóa
                     $this->sendJsonResponse(false, 'Slot not found, does not belong to you, or is booked and cannot be deleted.', 404);
                 }
             } else {
-                // Lỗi chung từ model (ví dụ: query thất bại)
                 throw new Exception('Database operation failed during slot deletion.');
             }
         } catch (Exception $e) { 
@@ -299,12 +295,7 @@ class DoctorController {
         if (!isset($_POST['csrf_token']) || !validateCsrfToken($_POST['csrf_token'])) { $this->sendJsonResponse(false, 'Invalid CSRF token.', 403); exit(); }
 
         $doctorId = $this->getLoggedInDoctorId();
-        $input = json_decode(file_get_contents('php://input'), true); // Giả sử client gửi JSON
-        
-        // Nếu client gửi form-data thì dùng $_POST
-        // $eventId = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT);
-        // $newStartStr = filter_var($_POST['start'] ?? null, FILTER_SANITIZE_SPECIAL_CHARS);
-        // $newEndStr = filter_var($_POST['end'] ?? null, FILTER_SANITIZE_SPECIAL_CHARS);
+        $input = json_decode(file_get_contents('php://input'), true); 
         
         $eventId = filter_var($input['id'] ?? null, FILTER_VALIDATE_INT);
         $newStartStr = filter_var($input['start'] ?? null, FILTER_SANITIZE_SPECIAL_CHARS);
@@ -317,7 +308,6 @@ class DoctorController {
             $newStartTime = date('H:i:s', strtotime($newStartStr)); 
             $newEndTime = date('H:i:s', strtotime($newEndStr));
             
-            // Cần kiểm tra xem slot có bị booked không trước khi cho update thời gian
             $slotDetails = $this->doctorAvailabilityModel->getSlotById($eventId);
             if (!$slotDetails || $slotDetails['DoctorID'] != $doctorId) {
                  $this->sendJsonResponse(false, 'Slot not found or not yours.', 404); exit();
@@ -344,10 +334,7 @@ class DoctorController {
         $doctorId = $this->getLoggedInDoctorId();
         $searchTerm = filter_input(INPUT_GET, 'search', FILTER_SANITIZE_SPECIAL_CHARS);
         
-        // Cần một hàm trong PatientModel để lấy danh sách bệnh nhân mà bác sĩ này đã từng khám
-        // hoặc tất cả bệnh nhân nếu logic cho phép.
-        // Ví dụ: $patients = $this->patientModel->getPatientsConsultedByDoctor($doctorId, $searchTerm);
-        $patients = $this->patientModel->getAllPatientsWithDetails($searchTerm); // Tạm thời lấy tất cả
+        $patients = $this->patientModel->getAllPatientsWithDetails($searchTerm); 
 
         $todaysAppointments = $this->appointmentModel->getTodaysAppointmentsForDoctor($doctorId);
 
@@ -360,7 +347,7 @@ class DoctorController {
                 'new_this_month' => $this->patientModel->getNewPatientsThisMonthCount(),
             ],
             'prescription_stats_data' => [ 
-                'labels' => ['Drug A', 'Drug B', 'Drug C'], // Placeholder
+                'labels' => ['Drug A', 'Drug B', 'Drug C'], 
                 'counts' => [rand(20,50), rand(10,30), rand(5,15)]
             ]
         ];
@@ -376,10 +363,10 @@ class DoctorController {
             'fullname' => trim($_POST['fullname'] ?? ''), 'username' => trim($_POST['username'] ?? ''),
             'email' => trim($_POST['email'] ?? ''), 'password' => $_POST['password'] ?? '',
             'confirm_password' => $_POST['confirm_password'] ?? '',
-            'phone_number' => trim($_POST['phone_number'] ?? null), // Cho phép null
-            'address' => trim($_POST['address'] ?? null), // Cho phép null
-            'date_of_birth' => trim($_POST['date_of_birth'] ?? null), // Cho phép null
-            'gender' => trim($_POST['gender'] ?? null) // Cho phép null
+            'phone_number' => trim($_POST['phone_number'] ?? null), 
+            'address' => trim($_POST['address'] ?? null), 
+            'date_of_birth' => trim($_POST['date_of_birth'] ?? null), 
+            'gender' => trim($_POST['gender'] ?? null) 
         ];
         $errors = [];
 
@@ -405,8 +392,8 @@ class DoctorController {
             $userData = [
                 'Username' => $input['username'], 'PasswordHash' => $passwordHash, 'Email' => $input['email'],
                 'FullName' => $input['fullname'], 'Role' => 'Patient', 
-                'PhoneNumber' => $input['phone_number'] ?: null, // Lưu NULL nếu rỗng
-                'Address' => $input['address'] ?: null, // Lưu NULL nếu rỗng
+                'PhoneNumber' => $input['phone_number'] ?: null, 
+                'Address' => $input['address'] ?: null, 
                 'Status' => 'Active' 
             ];
             $newUserId = $this->userModel->createUser($userData);
@@ -468,7 +455,7 @@ class DoctorController {
         $doctorId = $this->getLoggedInDoctorId();
         $data = [
             'title' => 'Request Time Off',
-            'input' => $_SESSION['leave_request_input'] ?? [], // Giữ lại input nếu có lỗi
+            'input' => $_SESSION['leave_request_input'] ?? [], 
             'errors' => $_SESSION['leave_request_errors'] ?? []
         ];
         unset($_SESSION['leave_request_input'], $_SESSION['leave_request_errors']);
@@ -507,11 +494,10 @@ class DoctorController {
         if (!empty($startDate) && strtotime($startDate) < strtotime(date('Y-m-d'))) {
             $errors['start_date'] = 'Start date cannot be in the past.';
         }
-        if (strlen($reason) > 1000) { // Giới hạn lý do
+        if (strlen($reason) > 1000) { 
             $errors['reason'] = 'Reason is too long (max 1000 characters).';
         }
 
-        // Kiểm tra lịch làm việc và lịch hẹn trùng lặp
         $overlappingAppointments = [];
         $overlappingAvailability = [];
         if (empty($errors) && !empty($startDate) && !empty($endDate)) {
@@ -519,10 +505,7 @@ class DoctorController {
             $overlappingAppointments = $this->leaveRequestModel->getOverlappingAppointments($doctorId, $startDate, $endDate);
 
             if (!empty($overlappingAvailability) || !empty($overlappingAppointments)) {
-                // Thay vì báo lỗi ngay, có thể lưu vào session để hiển thị cảnh báo trên form
                 $_SESSION['leave_request_warning'] = "Warning: Your requested time off overlaps with existing scheduled work or appointments. Please review them. Submitting will still create a pending request.";
-                // Hoặc nếu muốn chặn hoàn toàn:
-                // $errors['overlap'] = "Your requested time off overlaps with existing work/appointments. Please adjust your schedule or the leave dates.";
             }
         }
 
@@ -539,16 +522,11 @@ class DoctorController {
             'StartDate' => $startDate,
             'EndDate' => $endDate,
             'Reason' => $reason,
-            'Status' => 'Pending' // Trạng thái mặc định
+            'Status' => 'Pending' 
         ];
 
         if ($this->leaveRequestModel->createLeaveRequest($leaveData)) {
             $_SESSION['success_message'] = 'Your leave request has been submitted successfully and is pending approval.';
-            // Gửi thông báo cho Admin (nếu có hệ thống thông báo)
-            // $adminUsers = $this->userModel->getUsersByRole('Admin');
-            // foreach($adminUsers as $admin){
-            //    $this->notificationModel->createNotification([...]);
-            // }
             header('Location: ' . BASE_URL . '/doctor/myLeaveRequests');
         } else {
             $_SESSION['leave_request_input'] = $input;
@@ -560,7 +538,6 @@ class DoctorController {
 
     public function myLeaveRequests() {
         $doctorId = $this->getLoggedInDoctorId();
-        // Lấy thêm filter nếu cần, ví dụ: ?status=Pending
         $statusFilter = $_GET['status'] ?? null;
         
         $leaveRequests = $this->leaveRequestModel->getLeaveRequestsByDoctorId($doctorId, $statusFilter);
@@ -568,7 +545,7 @@ class DoctorController {
             'title' => 'My Leave Requests',
             'leaveRequests' => $leaveRequests,
             'currentStatusFilter' => $statusFilter,
-            'allStatuses' => ['Pending', 'Approved', 'Rejected', 'Cancelled'] // Để tạo filter dropdown
+            'allStatuses' => ['Pending', 'Approved', 'Rejected', 'Cancelled'] 
         ];
         $this->view('doctor/leave/my_requests', $data);
     }
@@ -594,13 +571,176 @@ class DoctorController {
         
         $doctorId = $this->getLoggedInDoctorId();
 
-        // LeaveRequestModel sẽ kiểm tra xem request có thuộc doctorId này và có status là Pending không
         if ($this->leaveRequestModel->cancelLeaveRequestByDoctor($leaveRequestId, $doctorId)) {
             $_SESSION['success_message'] = 'Leave request cancelled successfully.';
         } else {
             $_SESSION['error_message'] = 'Failed to cancel leave request. It might have already been processed or does not belong to you.';
         }
         header('Location: ' . BASE_URL . '/doctor/myLeaveRequests');
+        exit();
+    }
+
+    // <<<< GIẢ SỬ ĐÂY LÀ PHƯƠNG THỨC LƯU BỆNH ÁN VÀ ĐƠN THUỐC CỦA CẬU >>>>
+    public function saveConsultationAndPrescription() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            // Handle error, maybe redirect or send JSON response
+            header('Location: ' . BASE_URL . '/doctor/mySchedule');
+            exit();
+        }
+        if (!isset($_POST['csrf_token']) || !validateCsrfToken($_POST['csrf_token'])) {
+            $_SESSION['consultation_message_error'] = 'Invalid CSRF token.';
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/doctor/mySchedule'));
+            exit();
+        }
+
+        $doctorId = $this->getLoggedInDoctorId();
+        $appointmentId = filter_input(INPUT_POST, 'appointment_id', FILTER_VALIDATE_INT);
+        $appointmentDetails = $this->appointmentModel->getAppointmentDetailsById($appointmentId);
+        
+        if (!$appointmentDetails || $appointmentDetails['DoctorID'] != $doctorId) {
+            $_SESSION['consultation_message_error'] = 'Unauthorized action or appointment not found.';
+            header('Location: ' . BASE_URL . '/doctor/mySchedule');
+            exit();
+        }
+        
+        $patientId = $appointmentDetails['PatientUserID']; // Lấy UserID của bệnh nhân từ chi tiết lịch hẹn
+        $symptoms = trim($_POST['symptoms'] ?? '');
+        $diagnosis = trim($_POST['diagnosis'] ?? '');
+        $treatmentPlan = trim($_POST['treatment_plan'] ?? '');
+        $notes = trim($_POST['consultation_notes'] ?? '');
+        $prescriptionsArray = $_POST['prescriptions'] ?? []; 
+
+        $this->db->beginTransaction();
+        try {
+            $medicalRecordData = [
+                'AppointmentID' => $appointmentId,
+                'PatientID' => $patientId,
+                'DoctorID' => $doctorId,
+                'VisitDate' => $appointmentDetails['AppointmentDateTime'],
+                'Symptoms' => $symptoms,
+                'Diagnosis' => $diagnosis,
+                'TreatmentPlan' => $treatmentPlan,
+                'Notes' => $notes,
+            ];
+            
+            $existingRecord = $this->medicalRecordModel->getRecordByAppointmentId($appointmentId);
+            $recordId = $existingRecord ? $existingRecord['RecordID'] : null;
+            
+            if ($recordId) {
+                $this->medicalRecordModel->updateMedicalRecord($recordId, $medicalRecordData);
+            } else {
+                $recordId = $this->medicalRecordModel->createMedicalRecord($medicalRecordData);
+                if (!$recordId) throw new Exception("Failed to create medical record.");
+            }
+
+            $this->prescriptionModel->deletePrescriptionsByRecordId($recordId);
+
+            foreach ($prescriptionsArray as $item) {
+                $prescriptionData = [
+                    'RecordID' => $recordId,
+                    'MedicineID' => $item['medicine_id'],
+                    'Dosage' => $item['dosage'] ?? '',
+                    'Frequency' => $item['frequency'] ?? '',
+                    'Duration' => $item['duration'] ?? '',
+                    'Instructions' => $item['instructions'] ?? ''
+                ];
+                if (!$this->prescriptionModel->addPrescriptionItem($prescriptionData)) {
+                    throw new Exception("Failed to add prescription item for medicine ID " . $item['medicine_id']);
+                }
+                
+                if (isset($item['quantity_to_dispense']) && $item['quantity_to_dispense'] > 0) {
+                    $decreaseResult = $this->medicineModel->decreaseStock($item['medicine_id'], $item['quantity_to_dispense']);
+                    if (!$decreaseResult['success']) {
+                        throw new Exception($decreaseResult['message'] . " (Medicine ID: " . $item['medicine_id'] . ")");
+                    }
+                }
+            }
+            
+            $this->appointmentModel->updateAppointmentStatus($appointmentId, 'Completed');
+
+            $notificationData = [
+                'UserID' => $patientId,
+                'Type' => 'EMR_UPDATED',
+                'Message' => 'Your consultation summary with Dr. ' . $_SESSION['user_fullname'] . ' on ' . date('M j, Y') . ' is now available for viewing.',
+                'Link' => '/patient/viewAppointmentSummary/' . $appointmentId,
+                'RelatedEntityID' => $appointmentId,
+                'EntityType' => 'appointment'
+            ];
+            $this->notificationModel->createNotification($notificationData);
+
+            $this->db->commit();
+            $_SESSION['consultation_message_success'] = 'Consultation details and prescription saved successfully!';
+            header('Location: ' . BASE_URL . '/medicalrecord/viewConsultationDetails/' . $appointmentId);
+            exit();
+
+        } catch (Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log("Error in saveConsultationAndPrescription: " . $e->getMessage());
+            $_SESSION['consultation_message_error'] = "Database error: " . $e->getMessage();
+            $_SESSION['emr_form_input'] = $_POST; 
+            header('Location: ' . BASE_URL . '/medicalrecord/viewConsultationDetails/' . $appointmentId);
+            exit();
+        }
+    }
+
+    public function markAsCompleted() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $_SESSION['schedule_message_error'] = 'Invalid request method.';
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/doctor/mySchedule'));
+            exit();
+        }
+
+        if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'Doctor') {
+            $_SESSION['schedule_message_error'] = 'Unauthorized action.';
+            header('Location: ' . BASE_URL . '/auth/login');
+            exit();
+        }
+        
+        if (!isset($_POST['csrf_token']) || !validateCsrfToken($_POST['csrf_token'])) {
+            $_SESSION['schedule_message_error'] = 'Invalid CSRF token. Action aborted.';
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/doctor/mySchedule'));
+            exit();
+        }
+
+        $appointmentId = filter_input(INPUT_POST, 'appointment_id', FILTER_VALIDATE_INT);
+        $doctorId = $this->getLoggedInDoctorId(); // Lấy DoctorID của người đang đăng nhập
+
+        if (!$appointmentId || $appointmentId <= 0) {
+            $_SESSION['schedule_message_error'] = 'Invalid Appointment ID.';
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/doctor/mySchedule'));
+            exit();
+        }
+
+        try {
+            $appointmentDetails = $this->appointmentModel->getAppointmentById($appointmentId);
+
+            if (!$appointmentDetails) {
+                throw new Exception('Appointment not found.');
+            }
+
+            // Kiểm tra xem bác sĩ có đúng là người phụ trách lịch hẹn này không
+            if ($appointmentDetails['DoctorID'] != $doctorId) {
+                throw new Exception('You are not authorized to modify this appointment.');
+            }
+
+            if (!in_array($appointmentDetails['Status'], ['Scheduled', 'Confirmed'])) {
+                throw new Exception('This appointment cannot be marked as completed (current status: ' . htmlspecialchars($appointmentDetails['Status']) . ').');
+            }
+
+            if ($this->appointmentModel->updateAppointmentStatus($appointmentId, 'Completed')) {
+                $_SESSION['schedule_message_success'] = 'Appointment #' . $appointmentId . ' marked as completed successfully.';
+            } else {
+                throw new Exception('Failed to update appointment status in the database.');
+            }
+
+        } catch (Exception $e) {
+            error_log("Error marking appointment as completed by DoctorID {$doctorId}: " . $e->getMessage());
+            $_SESSION['schedule_message_error'] = 'Error: ' . $e->getMessage();
+        }
+
+        header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/doctor/mySchedule'));
         exit();
     }
 }

@@ -203,5 +203,18 @@ class UserModel {
         $row = $this->db->single();
         return $row ? (int)$row['user_count'] : 0;
     }
+/**
+ * Finds a user's details based on their DoctorID.
+ * @param int $doctorId The ID from the doctors table.
+ * @return array|false The user's data or false if not found.
+ */
+public function findUserByDoctorId($doctorId) {
+    $this->db->query("SELECT u.* 
+                    FROM users u 
+                    JOIN doctors d ON u.UserID = d.UserID 
+                    WHERE d.DoctorID = :doctor_id");
+    $this->db->bind(':doctor_id', $doctorId);
+    return $this->db->single();
+}
 }
 ?>

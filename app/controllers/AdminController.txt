@@ -15,13 +15,14 @@ class AdminController {
     private $doctorAvailabilityModel;
     private $backupPath;
     private $leaveRequestModel;
+    private $nurseModel; 
+    private $doctorNurseAssignmentModel; 
 
     public function __construct() {
         if (session_status() == PHP_SESSION_NONE) {
             session_start();
         }
 
-        // <<<< THÊM DÒNG NÀY VÀO ĐÂY NHA CẬU YÊU! >>>>
         require_once __DIR__ . '/../helpers/csrf_helper.php';
         
         $urlPath = $_GET['url'] ?? '';
@@ -53,7 +54,9 @@ class AdminController {
             $this->notificationModel = new NotificationModel();
             $this->doctorAvailabilityModel = new DoctorAvailabilityModel();
             $this->leaveRequestModel = new LeaveRequestModel(); 
-            $this->backupPath = __DIR__ . '/../../storage/backups/'; // Sửa lại đường dẫn cho đúng
+            $this->nurseModel = new NurseModel(); 
+            $this->doctorNurseAssignmentModel = new DoctorNurseAssignmentModel(); 
+            $this->backupPath = __DIR__ . '/../../storage/backups/'; 
         } catch (Error $e) {
             error_log("FATAL: Model initialization error in AdminController: " . $e->getMessage());
             die("A critical error occurred during application setup. Please check logs or contact support. Details: " . htmlspecialchars($e->getMessage()));
@@ -72,14 +75,21 @@ class AdminController {
                  exit();
             }
         }
+        
+        $currentUserFromDB = $this->userModel->findUserById($_SESSION['user_id'] ?? 0);
+
         if (!isset($data['currentUser'])) {
             $data['currentUser'] = [
                 'UserID' => $_SESSION['user_id'] ?? null,
-                'FullName' => $_SESSION['user_fullname'] ?? 'Admin',
+                'FullName' => $currentUserFromDB['FullName'] ?? ($_SESSION['user_fullname'] ?? 'Admin'),
                 'Role' => $_SESSION['user_role'] ?? null,
-                'Avatar' => $_SESSION['user_avatar'] ?? null
+                'Avatar' => $currentUserFromDB['Avatar'] ?? ($_SESSION['user_avatar'] ?? null)
             ];
+        } else { 
+            $data['currentUser']['FullName'] = $data['currentUser']['FullName'] ?? $currentUserFromDB['FullName'] ?? ($_SESSION['user_fullname'] ?? 'Admin');
+            $data['currentUser']['Avatar'] = $data['currentUser']['Avatar'] ?? $currentUserFromDB['Avatar'] ?? ($_SESSION['user_avatar'] ?? null);
         }
+
         if (!isset($data['title'])) {
             $data['title'] = 'Admin Panel'; 
         }
@@ -87,10 +97,11 @@ class AdminController {
         if (file_exists(__DIR__ . '/../views/' . $view . '.php')) {
             require_once __DIR__ . '/../views/' . $view . '.php';
         } else {
-            die("View '{$view}' does not exist, my dear admin.");
+            error_log("AdminController: View '{$view}' does not exist.");
+            die("View '{$view}' does not exist, my dear admin. Please check the path.");
         }
     }
-
+    
     public function dashboard() {
         $adminUserId = $_SESSION['user_id'];
         $userStats = [
@@ -206,7 +217,7 @@ class AdminController {
                         $doctorData = ['SpecializationID' => $data['input']['SpecializationID'], 'Bio' => $data['input']['Bio'], 'ExperienceYears' => $data['input']['ExperienceYears'], 'ConsultationFee' => $data['input']['ConsultationFee']];
                         if (!$this->doctorModel->createDoctorProfile($newUserId, $doctorData)) throw new Exception('Failed to create Doctor profile.');
                     } elseif ($data['input']['Role'] === 'Nurse') {
-                        if (!$this->userModel->createNurseProfile($newUserId)) throw new Exception('Failed to create Nurse profile.');
+                        if (!$this->nurseModel->createNurseProfile($newUserId)) throw new Exception('Failed to create Nurse profile.'); 
                     } elseif ($data['input']['Role'] === 'Patient') {
                         $patientData = ['UserID' => $newUserId]; 
                         if (!$this->patientModel->createPatient($patientData)) throw new Exception('Failed to create Patient profile.');
@@ -776,8 +787,9 @@ class AdminController {
                              $_SESSION['user_avatar'] = $avatarPathForDB; 
                         }
                         
-                        header('Location: ' . BASE_URL . '/admin/updateProfile');
-                        exit();
+
+                        $this->updateProfile(); 
+                        return;
                     } else {
                         $this->db->rollBack();
                         if ($avatarFileUploaded && $avatarPathForDB !== $currentUser['Avatar'] && file_exists(rtrim(PUBLIC_PATH, '/') . '/' . ltrim($avatarPathForDB, '/'))) {
@@ -1091,6 +1103,72 @@ class AdminController {
 
         header('Location: ' . BASE_URL . '/admin/manageLeaveRequests');
         exit();
+    }
+
+    public function manageDoctorNurseAssignments() {
+        $doctors = $this->doctorModel->getAllDoctorsWithDetails(); 
+        $allNurses = $this->nurseModel->getAllNursesWithUserDetails(); 
+        
+        $assignmentsData = [];
+        if (is_array($doctors)) { // Check if $doctors is an array before looping
+            foreach ($doctors as $doctor) {
+                $assignedNurses = $this->doctorNurseAssignmentModel->getAssignedNursesByDoctorId($doctor['DoctorID']);
+                $unassignedNursesForThisDoctor = $this->doctorNurseAssignmentModel->getUnassignedNursesForDoctor($doctor['DoctorID'], $allNurses);
+                
+                $assignmentsData[] = [
+                    'doctor_id' => $doctor['DoctorID'],
+                    'doctor_name' => $doctor['FullName'], 
+                    'doctor_specialization' => $doctor['SpecializationName'] ?? 'N/A', 
+                    'assigned_nurses' => $assignedNurses,
+                    'available_nurses_for_assignment' => $unassignedNursesForThisDoctor
+                ];
+            }
+        }
+
+
+        $data = [
+            'title' => 'Manage Doctor-Nurse Assignments',
+            'assignments_data' => $assignmentsData,
+        ];
+        $this->view('admin/assignments/manage', $data); 
+    }
+
+    public function processAssignment() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $_SESSION['assignment_message_error'] = 'Invalid request method.';
+            $this->manageDoctorNurseAssignments(); 
+            return;
+        }
+        if (!isset($_POST['csrf_token']) || !validateCsrfToken($_POST['csrf_token'])) {
+            $_SESSION['assignment_message_error'] = 'Invalid CSRF token.';
+            $this->manageDoctorNurseAssignments();
+            return;
+        }
+
+        $doctorId = filter_input(INPUT_POST, 'doctor_id', FILTER_VALIDATE_INT);
+        $nurseId = filter_input(INPUT_POST, 'nurse_id', FILTER_VALIDATE_INT);
+        $actionType = trim($_POST['action_type'] ?? ''); 
+
+        if (!$doctorId || !$nurseId || !in_array($actionType, ['assign', 'unassign'])) {
+            $_SESSION['assignment_message_error'] = 'Invalid data provided for assignment processing.';
+            $this->manageDoctorNurseAssignments();
+            return;
+        }
+
+        $result = null;
+        if ($actionType === 'assign') {
+            $result = $this->doctorNurseAssignmentModel->assignNurseToDoctor($doctorId, $nurseId);
+        } elseif ($actionType === 'unassign') {
+            $result = $this->doctorNurseAssignmentModel->unassignNurseFromDoctor($doctorId, $nurseId);
+        }
+
+        if ($result && isset($result['success']) && $result['success']) { 
+            $_SESSION['assignment_message_success'] = $result['message'];
+        } else {
+            $_SESSION['assignment_message_error'] = $result['message'] ?? 'An unknown error occurred during assignment processing.';
+        }
+        
+        $this->manageDoctorNurseAssignments();
     }
 }
 ?>

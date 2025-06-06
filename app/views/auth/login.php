@@ -32,22 +32,22 @@ if (function_exists('generateCsrfToken')) {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
             font-family: 'Poppins', sans-serif; 
-            background: linear-gradient(135deg, #E0F7FA 0%, #B2EBF2 100%); /* Màu nền gradient xanh nhạt */
+            background: linear-gradient(135deg, #E0F7FA 0%, #B2EBF2 100%);
             display: flex; 
             justify-content: center; 
             align-items: center; 
             min-height: 100vh; 
-            color: #37474F; /* Màu chữ chính đậm hơn chút */
+            color: #37474F;
             padding: 20px;
         }
         .auth-container-wrapper-cutie { 
             display: flex; 
             width: 100%; 
-            max-width: 950px; /* Giảm chút cho cân đối hơn */
-            min-height: 600px; /* Giảm chút */
+            max-width: 950px;
+            min-height: 600px;
             background-color: #fff; 
-            border-radius: 16px; /* Bo góc nhiều hơn */
-            box-shadow: 0 15px 40px rgba(0, 77, 64, 0.1); /* Bóng đổ tinh tế hơn */
+            border-radius: 16px;
+            box-shadow: 0 15px 40px rgba(0, 77, 64, 0.1);
             overflow: hidden; 
         }
         
@@ -61,44 +61,43 @@ if (function_exists('generateCsrfToken')) {
         .auth-header-cutie { 
             display: flex; 
             align-items: center; 
-            margin-bottom: 30px; /* Tăng margin */
+            margin-bottom: 30px;
         }
-        .auth-logo-img-cutie { /* Thay placeholder bằng img */
-            width: 120px; /* Kích thước logo PulseCare */
+        .auth-logo-img-cutie { 
+            width: 120px;
             height: auto;
             margin-right: 15px;
         }
-        /* .auth-hospital-name-cutie { font-size: 22px; font-weight: 600; color: #00796B; } */ /* Bỏ nếu dùng logo ảnh */
         
         .auth-form-section-cutie h1 { 
-            font-size: 26px; /* Giảm chút */
+            font-size: 26px;
             font-weight: 700; 
-            color: #004D40; /* Xanh đậm cho tiêu đề */
+            color: #004D40;
             margin-bottom: 10px; 
         }
         .auth-form-section-cutie .form-description-cutie { 
             font-size: 15px; 
             color: #546E7A; 
-            margin-bottom: 30px; /* Tăng margin */
+            margin-bottom: 30px;
             line-height: 1.6; 
         }
         
         .role-selector-cutie { margin-bottom: 25px; }
         .role-selector-cutie p { font-size: 14px; color: #37474F; margin-bottom: 10px; font-weight: 500; text-align: left; }
-        .role-buttons-cutie { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; } /* Đổi thành grid cho đẹp hơn */
+        .role-buttons-cutie { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
         .role-button-cutie {
             padding: 12px 10px; border: 1px solid #CFD8DC; border-radius: 8px; background-color: #fff;
             cursor: pointer; text-align: center; transition: all 0.3s ease; font-size: 13px; color: #455A64;
-            display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; /* Sửa lại cho icon và text cùng hàng */
+            display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px;
         }
         .role-button-cutie:hover { border-color: #00796B; background-color: #E0F2F1;}
         .role-button-cutie.selected-role-cutie { 
-            border-color: #004D40; /* Xanh đậm hơn */
-            background-color: #00796B; /* Xanh đậm làm nền */
-            color: #fff; /* Chữ trắng */
+            border-color: #004D40;
+            background-color: #00796B;
+            color: #fff;
             font-weight: 600; 
         }
-        .role-button-cutie .role-icon-placeholder-cutie { font-size: 18px; } /* Giảm size icon chút */
+        .role-button-cutie .role-icon-placeholder-cutie { font-size: 18px; }
 
         .form-group-cutie { margin-bottom: 20px; text-align: left; }
         .form-group-cutie label { display: block; font-size: 14px; color: #37474F; margin-bottom: 8px; font-weight: 500; }
@@ -107,39 +106,38 @@ if (function_exists('generateCsrfToken')) {
             transition: border-color 0.3s ease, box-shadow 0.3s ease;
         }
         .form-group-cutie input[type="text"]:focus, .form-group-cutie input[type="password"]:focus { 
-            outline: none; border-color: #00796B; /* Xanh đậm khi focus */
+            outline: none; border-color: #00796B;
             box-shadow: 0 0 0 3px rgba(0, 121, 107, 0.2); 
         }
         
         .forgot-password-link-cutie { 
             display: block; text-align: right; font-size: 13px; 
-            color: #00796B; /* Xanh đậm */
+            color: #00796B;
             text-decoration: none; margin-top: -10px; margin-bottom: 20px; 
         }
         .forgot-password-link-cutie:hover { text-decoration: underline; }
 
         .btn-auth-primary-cutie {
-            background-color: #00796B; /* Xanh đậm */
-            color: white; border: none; padding: 14px 20px; font-size: 16px; font-weight: 600; /* Giảm bold */
-            border-radius: 8px; cursor: pointer; width: 100%; text-transform: uppercase; letter-spacing: 0.8px; /* Tăng letter spacing */
+            background-color: #00796B;
+            color: white; border: none; padding: 14px 20px; font-size: 16px; font-weight: 600;
+            border-radius: 8px; cursor: pointer; width: 100%; text-transform: uppercase; letter-spacing: 0.8px;
             transition: background-color 0.3s ease, transform 0.2s ease;
         }
         .btn-auth-primary-cutie:hover { background-color: #004D40; transform: translateY(-2px); }
         
         .message-box-cutie { padding: 12px 15px; margin-bottom: 20px; border-radius: 8px; font-size: 14px; text-align: left; border-width: 1px; border-style: solid; }
-        .error-message-cutie { background-color: #FFEBEE; color: #C62828; border-color: #FFCDD2; } /* Đỏ nhạt hơn */
+        .error-message-cutie { background-color: #FFEBEE; color: #C62828; border-color: #FFCDD2; }
         .success-message-cutie { background-color: #E8F5E9; color: #2E7D32; border-color: #C8E6C9; }
         .error-text-cutie { color: #D32F2F; font-size: 12px; margin-top: 5px; }
         
         .auth-alternative-link-cutie { margin-top: 25px; text-align: center; font-size: 14px; color: #455A64; }
-        .auth-alternative-link-cutie a { color: #00796B; text-decoration: none; font-weight: 600; } /* Xanh đậm */
+        .auth-alternative-link-cutie a { color: #00796B; text-decoration: none; font-weight: 600; }
         .auth-alternative-link-cutie a:hover { text-decoration: underline; }
         .auth-alternative-link-cutie.hidden-by-role-cutie { display: none !important; }
 
-
         .auth-decorative-section-cutie {
-            flex: 1.2; /* Cho phần này rộng hơn chút */
-            background: linear-gradient(to bottom right, #4DB6AC, #26A69A); /* Gradient xanh cho phần ảnh */
+            flex: 1.2;
+            background: linear-gradient(to bottom right, #4DB6AC, #26A69A);
             display: flex; 
             justify-content: center; 
             align-items: center; 
@@ -151,10 +149,10 @@ if (function_exists('generateCsrfToken')) {
             text-align: center;
             color: white;
         }
-        .decorative-content-cutie img { /* Ảnh bác sĩ */
+        .decorative-content-cutie img {
             max-width: 80%;
             height: auto;
-            border-radius: 12px; /* Bo góc ảnh nếu cần */
+            border-radius: 12px;
             margin-bottom: 25px;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
         }
@@ -172,19 +170,18 @@ if (function_exists('generateCsrfToken')) {
             opacity: 0.9;
         }
 
-        @media (max-width: 850px) { /* Điều chỉnh breakpoint */
+        @media (max-width: 850px) {
             .auth-container-wrapper-cutie { flex-direction: column; max-width: 500px; min-height: auto; }
             .auth-decorative-section-cutie { 
-                /* display: none; */ /* Vẫn hiển thị nhưng có thể đơn giản hơn */
-                min-height: 300px; /* Chiều cao tối thiểu cho mobile */
-                flex: unset; /* Bỏ flex grow */
-                order: -1; /* Đưa lên đầu trên mobile */
+                min-height: 300px;
+                flex: unset;
+                order: -1;
             }
             .decorative-content-cutie img { max-width: 60%; margin-bottom: 20px;}
             .decorative-content-cutie h2 { font-size: 22px; }
             .decorative-content-cutie p { font-size: 14px; }
             .auth-form-section-cutie { padding: 30px; }
-            .role-buttons-cutie { grid-template-columns: 1fr; } /* 1 cột trên mobile */
+            .role-buttons-cutie { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -192,7 +189,8 @@ if (function_exists('generateCsrfToken')) {
     <div class="auth-container-wrapper-cutie">
         <div class="auth-form-section-cutie">
             <div class="auth-header-cutie">
-                <img src="<?php echo BASE_URL; ?>/public/assets/images/pulsecare_logo.png" alt="PulseCare Logo" class="auth-logo-img-cutie">
+                <!-- <<<< SỬA LẠI ĐƯỜNG DẪN Ở ĐÂY NÈ CẬU >>>> -->
+                <img src="<?php echo BASE_URL; ?>/assets/images/pulsecare_logo.png" alt="PulseCare Logo" class="auth-logo-img-cutie">
             </div>
 
             <h1>Welcome Back!</h1>
@@ -221,11 +219,12 @@ if (function_exists('generateCsrfToken')) {
                         <span class="role-icon-placeholder-cutie">⚙️</span> Admin
                     </button>
                 </div>
-                <input type="hidden" name="selected_role" id="selected_role_input" value="Patient">
             </div>
 
             <form action="<?php echo htmlspecialchars(BASE_URL . '/auth/login'); ?>" method="POST" novalidate>
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+                <!-- Thêm input ẩn cho vai trò được chọn -->
+                <input type="hidden" name="selected_role" id="selected_role_input" value="Patient">
                 
                 <div class="form-group-cutie">
                     <label for="username_or_email">Username or Email</label>
@@ -248,7 +247,8 @@ if (function_exists('generateCsrfToken')) {
         </div>
         <div class="auth-decorative-section-cutie">
             <div class="decorative-content-cutie">
-                <img src="<?php echo BASE_URL; ?>/public/assets/images/doctor_login_image.png" alt="Professional Doctor">
+                <!-- <<<< VÀ SỬA LẠI ĐƯỜNG DẪN Ở ĐÂY NỮA NHA >>>> -->
+                <img src="<?php echo BASE_URL; ?>/assets/images/doctor_login_image.png" alt="Professional Doctor">
                 <h2>Taking care of your health is our top priority.</h2>
                 <p>Being healthy is more than just not getting sick. It entails mental, physical, and social well-being. It's not just about treatment, it's about healing.</p>
             </div>
@@ -273,7 +273,7 @@ if (function_exists('generateCsrfToken')) {
             
             const defaultRole = selectedRoleInput ? selectedRoleInput.value : 'Patient';
             toggleSignUpLink(defaultRole);
-            // Make sure the default selected button also reflects this
+            
             roleButtons.forEach(button => {
                 if (button.dataset.role === defaultRole) {
                     button.classList.add('selected-role-cutie');
@@ -281,7 +281,6 @@ if (function_exists('generateCsrfToken')) {
                     button.classList.remove('selected-role-cutie');
                 }
             });
-
 
             roleButtons.forEach(button => {
                 button.addEventListener('click', function () {

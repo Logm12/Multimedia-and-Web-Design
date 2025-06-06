@@ -815,29 +815,58 @@ class AdminController {
     }
 
 
+    public function manageFeedbacks() {
+        $filters = [
+            'doctor_id' => filter_input(INPUT_GET, 'doctor_id', FILTER_VALIDATE_INT),
+            'rating' => filter_input(INPUT_GET, 'rating', FILTER_VALIDATE_INT),
+            'is_published' => filter_input(INPUT_GET, 'is_published', FILTER_SANITIZE_SPECIAL_CHARS),
+            'search_term' => trim(filter_input(INPUT_GET, 'search_term', FILTER_SANITIZE_SPECIAL_CHARS) ?? '')
+        ];
+
+        $feedbacks = $this->feedbackModel->getAllFeedbacksWithDetails($filters);
+        $doctors = $this->doctorModel->getAllDoctorsSimple(); // Lấy danh sách bác sĩ để lọc
+        
+        $data = [
+            'title' => 'Manage Patient Feedbacks',
+            'feedbacks' => $feedbacks,
+            'doctors' => $doctors, 
+            'filters' => $filters 
+        ];
+        
+        $this->view('admin/feedbacks/manage', $data);
+    }
+
     public function toggleFeedbackPublication() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $_SESSION['admin_feedback_message_error'] = 'Invalid request method.';
-            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/admin/manageFeedbacks')); exit();
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/admin/manageFeedbacks')); 
+            exit();
         }
         if (!isset($_POST['csrf_token']) || !validateCsrfToken($_POST['csrf_token'])) {
             $_SESSION['admin_feedback_message_error'] = 'Invalid CSRF token.';
-            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/admin/manageFeedbacks')); exit();
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/admin/manageFeedbacks')); 
+            exit();
         }
+
         $feedbackId = filter_input(INPUT_POST, 'feedback_id', FILTER_VALIDATE_INT);
         $currentStatus = filter_input(INPUT_POST, 'current_status', FILTER_VALIDATE_INT);
+
         if (!$feedbackId || $feedbackId <= 0 || !in_array($currentStatus, [0, 1])) {
             $_SESSION['admin_feedback_message_error'] = 'Invalid feedback data provided.';
-            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/admin/manageFeedbacks')); exit();
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/admin/manageFeedbacks')); 
+            exit();
         }
+
         $newStatus = ($currentStatus == 1) ? 0 : 1;
+        
         if ($this->feedbackModel->updateFeedbackPublicationStatus($feedbackId, $newStatus)) {
-            $actionText = $newStatus == 1 ? 'published' : 'unpublished';
+            $actionText = $newStatus == 1 ? 'published' : 'hidden';
             $_SESSION['admin_feedback_message_success'] = "Feedback #{$feedbackId} has been successfully {$actionText}.";
         } else {
             $_SESSION['admin_feedback_message_error'] = "Failed to update publication status for feedback #{$feedbackId}.";
         }
-        header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/admin/manageFeedbacks'));
+        
+        header('Location: ' . BASE_URL . '/admin/manageFeedbacks');
         exit();
     }
     public function databaseManagement() {
